@@ -71,7 +71,7 @@ O resultado é uma framework leve, sem dependências de runtime, construída 100
 
 ## Arquitetura Geral
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         ZentJS Core                                 │
 │                                                                     │
@@ -103,7 +103,7 @@ O resultado é uma framework leve, sem dependências de runtime, construída 100
 
 ## Estrutura de Diretórios
 
-```
+```text
 zentjs/
 ├── src/
 │   ├── index.mjs                 # Entry point — exporta a função zent()
@@ -198,7 +198,7 @@ app.listen({ port: 3000, host: '0.0.0.0' }, (err, address) => {
 
 **Diagrama de classe:**
 
-```
+```text
 ┌────────────────────────────────────┐
 │            Zent (Application)      │
 ├────────────────────────────────────┤
@@ -272,7 +272,7 @@ _\* k = comprimento do path, independente do número de rotas_
 
 **Exemplo de árvore para as rotas:**
 
-```
+```text
 GET  /users
 GET  /users/:id
 POST /users
@@ -280,7 +280,7 @@ GET  /users/:id/posts
 GET  /about
 ```
 
-```
+```text
                     root ('')
                     ├── /u
                     │   └── sers
@@ -425,7 +425,7 @@ async function myMiddleware(ctx, next) {
 
 **Tipos de middleware:**
 
-```
+```text
 ┌──────────────────────────────────────────────────┐
 │              Middleware Pipeline                 │
 │                                                  │
@@ -494,12 +494,12 @@ Inspirado diretamente no Fastify, com **encapsulamento de escopo**.
 async function dbPlugin(app, opts) {
   const connection = await connectDB(opts.uri);
 
-  // Decorator: adiciona propriedade à instância
+  // Decorator: adiciona propriedade ao escopo atual do plugin
   app.decorate('db', connection);
 
   // Hook específico do escopo
-  app.addHook('onClose', async () => {
-    await connection.close();
+  app.addHook('onRequest', async (ctx) => {
+    ctx.state.db = connection;
   });
 }
 
@@ -509,7 +509,7 @@ app.register(dbPlugin, { uri: 'mongodb://localhost/mydb' });
 
 **Encapsulamento:**
 
-```
+```text
 ┌─────────────────────────────────────────────┐
 │  Root Scope (app)                           │
 │  ├── global middlewares                     │
@@ -518,7 +518,7 @@ app.register(dbPlugin, { uri: 'mongodb://localhost/mydb' });
 │  │  ┌────────────────────────────────────┐  │
 │  │  │  Plugin Scope A                    │  │
 │  │  │  ├── herda middlewares do pai      │  │
-│  │  │  ├── decorators locais (app.db)    │  │
+│  │  │  ├── decorators locais (scope.db)  │  │
 │  │  │  └── rotas locais (/api/v1/*)      │  │
 │  │  └────────────────────────────────────┘  │
 │  │                                          │
@@ -534,7 +534,7 @@ app.register(dbPlugin, { uri: 'mongodb://localhost/mydb' });
 
 **Propriedades do Plugin Manager:**
 
-```
+```text
 ┌──────────────────────────────────────┐
 │          PluginManager               │
 ├──────────────────────────────────────┤
@@ -557,7 +557,7 @@ Hooks permitem interceptar diferentes fases do ciclo de vida de uma requisição
 
 **Hooks disponíveis (em ordem de execução):**
 
-```
+```text
 Requisição chega
        │
        ▼
@@ -667,7 +667,7 @@ Sistema de erros estruturado com classes customizadas e error handler global.
 
 **Hierarquia de erros:**
 
-```
+```text
 Error
  └── HttpError
       ├── BadRequestError        (400)
@@ -728,7 +728,7 @@ app.setErrorHandler((error, ctx) => {
 
 Diagrama completo do ciclo de vida de uma requisição HTTP no ZentJS:
 
-```
+```text
 Cliente HTTP
      │
      ▼
@@ -832,14 +832,14 @@ const app = zent(options?);
 ### Métodos de roteamento
 
 ```js
-app.get(path, [options], handler);
-app.post(path, [options], handler);
-app.put(path, [options], handler);
-app.patch(path, [options], handler);
-app.delete(path, [options], handler);
-app.head(path, [options], handler);
-app.options(path, [options], handler);
-app.all(path, [options], handler); // Todos os métodos
+app.get(path, handler, [options]);
+app.post(path, handler, [options]);
+app.put(path, handler, [options]);
+app.patch(path, handler, [options]);
+app.delete(path, handler, [options]);
+app.head(path, handler, [options]);
+app.options(path, handler, [options]);
+app.all(path, handler, [options]); // Todos os métodos
 app.route(routeDefinition); // Definição completa
 ```
 
@@ -848,12 +848,16 @@ app.route(routeDefinition); // Definição completa
 ```js
 app.post(
   '/users',
-  {
-    preHandler: [authMiddleware], // Middlewares específicos da rota
-    onResponse: [logMiddleware], // Hooks específicos da rota
-  },
   async (ctx) => {
     // ...
+  },
+  {
+    middlewares: [authMiddleware], // Middlewares específicos da rota
+    hooks: {
+      preValidation: [validateBody],
+      preHandler: [ensureAuth],
+      onResponse: [logMiddleware],
+    },
   }
 );
 ```
@@ -945,7 +949,7 @@ Cada exemplo sobe o servidor em `127.0.0.1:3000`.
 ### Hello World
 
 ```js
-import { zent } from 'zentjs';
+import { UnauthorizedError, zent } from 'zentjs';
 
 const app = zent();
 
@@ -1148,12 +1152,12 @@ Com as fases 1–5 concluídas, o próximo ciclo passa a ser guiado por **entreg
 
 Objetivo: alinhar comportamento real com a API pública/documentação.
 
-| Item | Escopo |
-| --- | --- |
-| 6.1 | Executar `onSend` no dispatch da requisição (incluindo transformação de payload) |
-| 6.2 | Suporte completo a `app.use('/prefix', middleware)` |
-| 6.3 | Implementar `setNotFoundHandler()` na aplicação |
-| 6.4 | Garantir hooks de rota além de `preHandler` conforme contrato público |
+| Item | Escopo                                                                           |
+| ---- | -------------------------------------------------------------------------------- |
+| 6.1  | Executar `onSend` no dispatch da requisição (incluindo transformação de payload) |
+| 6.2  | Suporte completo a `app.use('/prefix', middleware)`                              |
+| 6.3  | Implementar `setNotFoundHandler()` na aplicação                                  |
+| 6.4  | Garantir hooks de rota além de `preHandler` conforme contrato público            |
 
 **Testes da fase 6:**
 
@@ -1164,12 +1168,12 @@ Objetivo: alinhar comportamento real com a API pública/documentação.
 
 Objetivo: garantir isolamento entre escopos pai/filho/irmãos.
 
-| Item | Escopo |
-| --- | --- |
-| 7.1 | Isolar decorators por escopo de plugin |
-| 7.2 | Isolar hooks e middlewares com herança controlada pai → filho |
-| 7.3 | Validar que plugins irmãos não compartilham estado interno |
-| 7.4 | Fortalecer contratos de registro/carregamento em cascata |
+| Item | Escopo                                                        |
+| ---- | ------------------------------------------------------------- |
+| 7.1  | Isolar decorators por escopo de plugin                        |
+| 7.2  | Isolar hooks e middlewares com herança controlada pai → filho |
+| 7.3  | Validar que plugins irmãos não compartilham estado interno    |
+| 7.4  | Fortalecer contratos de registro/carregamento em cascata      |
 
 **Testes da fase 7:**
 
@@ -1180,12 +1184,12 @@ Objetivo: garantir isolamento entre escopos pai/filho/irmãos.
 
 Objetivo: endurecer comportamento em cenários de borda.
 
-| Item | Escopo |
-| --- | --- |
-| 8.1 | Revisar fluxo de erro para evitar respostas duplicadas |
-| 8.2 | Consolidar resposta de parse inválido de body (ex.: JSON inválido) |
-| 8.3 | Melhorar consistência entre `inject()` e servidor real |
-| 8.4 | Cobrir cenários limite de headers/body/status |
+| Item | Escopo                                                             |
+| ---- | ------------------------------------------------------------------ |
+| 8.1  | Revisar fluxo de erro para evitar respostas duplicadas             |
+| 8.2  | Consolidar resposta de parse inválido de body (ex.: JSON inválido) |
+| 8.3  | Melhorar consistência entre `inject()` e servidor real             |
+| 8.4  | Cobrir cenários limite de headers/body/status                      |
 
 **Testes da fase 8:**
 
@@ -1196,11 +1200,11 @@ Objetivo: endurecer comportamento em cenários de borda.
 
 Objetivo: manter documentação e uso prático sempre sincronizados.
 
-| Item | Escopo |
-| --- | --- |
-| 9.1 | Corrigir lint de markdown (fenced blocks com linguagem) |
-| 9.2 | Revisar README para refletir somente comportamento implementado |
-| 9.3 | Padronizar exemplos para cobrir APIs críticas do ciclo 6–8 |
+| Item | Escopo                                                          |
+| ---- | --------------------------------------------------------------- |
+| 9.1  | Corrigir lint de markdown (fenced blocks com linguagem)         |
+| 9.2  | Revisar README para refletir somente comportamento implementado |
+| 9.3  | Padronizar exemplos para cobrir APIs críticas do ciclo 6–8      |
 
 **Testes/validações da fase 9:**
 
@@ -1211,11 +1215,11 @@ Objetivo: manter documentação e uso prático sempre sincronizados.
 
 Objetivo: preparar baseline para evolução com segurança.
 
-| Item | Escopo |
-| --- | --- |
-| 10.1 | Benchmark básico de roteamento e pipeline |
+| Item | Escopo                                                     |
+| ---- | ---------------------------------------------------------- |
+| 10.1 | Benchmark básico de roteamento e pipeline                  |
 | 10.2 | Métricas mínimas por requisição (tempo e status) via hooks |
-| 10.3 | Cenários de carga leve para regressão de performance |
+| 10.3 | Cenários de carga leve para regressão de performance       |
 
 **Testes/validações da fase 10:**
 

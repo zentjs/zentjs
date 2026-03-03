@@ -2,17 +2,42 @@ import { bodyParser, cors, zent } from '../src/index.mjs';
 
 const app = zent();
 
+app.addHook('onSend', async (ctx, payload) => {
+  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    return {
+      data: payload,
+      meta: {
+        path: ctx.req.path,
+        method: ctx.req.method,
+      },
+    };
+  }
+
+  return payload;
+});
+
+app.setNotFoundHandler((ctx) => {
+  ctx.res.status(404).json({
+    error: 'Route not found',
+    path: ctx.req.path,
+  });
+});
+
 app.register(
   async (scope) => {
     scope.use(cors({ origin: 'http://localhost:5173', credentials: true }));
     scope.use(bodyParser({ limit: 512 * 1024 }));
 
+    scope.addHook('onRequest', async (ctx) => {
+      ctx.state.scope = 'api';
+    });
+
     scope.get('/health', (ctx) => {
-      ctx.res.json({ ok: true });
+      return { ok: true, scope: ctx.state.scope };
     });
 
     scope.post('/echo', (ctx) => {
-      ctx.res.json({ body: ctx.req.body });
+      return { body: ctx.req.body, scope: ctx.state.scope };
     });
   },
   { prefix: '/api' }
