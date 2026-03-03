@@ -1,0 +1,30 @@
+{
+  "name": "zentjs",
+  "version": "0.0.1",
+  "description": "Framework API Web",
+  "license": "BSD-3-Clause",
+  "author": "Walber Vaz",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint . --ext .js,.mjs && prettier --check . --ext .js,.mjs",
+    "lint:fix": "eslint . --ext .js,.mjs --fix && prettier --write . --ext .js,.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "^25.3.3",
+    "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "10.0.2",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-prettier": "5.5.5",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
+    "globals": "17.4.0",
+    "jiti": "^2.6.1",
+    "prettier": "3.8.1",
+    "supertest": "^7.2.2",
+    "vitest": "4.0.18"
+  }
+}

@@ -1,0 +1,1186 @@
+# ZentJS
+
+> Framework web minimalista e performático para Node.js, inspirado no Express e Fastify.
+
+**Zero dependências em runtime** · **ESM-only** · **Node.js ≥ 20**
+
+---
+
+## Sumário
+
+- [Visão Geral](#visão-geral)
+- [Motivação e Princípios](#motivação-e-princípios)
+- [Arquitetura Geral](#arquitetura-geral)
+- [Estrutura de Diretórios](#estrutura-de-diretórios)
+- [Componentes Principais](#componentes-principais)
+  - [Application (Zent)](#1-application-zent)
+  - [Router (Radix Tree)](#2-router-radix-tree)
+  - [Request](#3-request)
+  - [Response](#4-response)
+  - [Middleware Pipeline](#5-middleware-pipeline)
+  - [Plugin System](#6-plugin-system)
+  - [Lifecycle Hooks](#7-lifecycle-hooks)
+  - [Context (ctx)](#8-context-ctx)
+  - [Error Handling](#9-error-handling)
+- [Fluxo de uma Requisição](#fluxo-de-uma-requisição)
+- [API Pública](#api-pública)
+- [Exemplos de Uso](#exemplos-de-uso)
+- [Roadmap de Implementação](#roadmap-de-implementação)
+- [Decisões Técnicas (ADRs)](#decisões-técnicas-adrs)
+- [Referências](#referências)
+
+---
+
+## Visão Geral
+
+**ZentJS** é uma framework HTTP para construção de APIs e aplicações web em Node.js.
+O objetivo é combinar o melhor dos dois mundos:
+
+| Inspiração    | O que trazemos                                              |
+| ------------- | ----------------------------------------------------------- |
+| **Express**   | API simples e intuitiva, middleware `(req, res, next)`       |
+| **Fastify**   | Performance, sistema de plugins com encapsulamento, hooks de ciclo de vida |
+
+O resultado é uma framework leve, sem dependências de runtime, construída 100% sobre o módulo nativo `node:http`.
+
+---
+
+## Motivação e Princípios
+
+### Por que criar outra framework?
+
+1. **Aprendizado profundo** — Entender os internos de uma framework HTTP modular.
+2. **Zero dependências** — O core não depende de nenhum pacote externo.
+3. **ESM nativo** — Sem CommonJS, sem transpilação, sem build step.
+4. **Performance by design** — Roteamento via Radix Tree, sem regex em hot path.
+5. **Developer Experience** — API clara, erros descritivos, tipagem via JSDoc.
+
+### Princípios Arquiteturais
+
+| Princípio               | Descrição                                                         |
+| ------------------------ | ----------------------------------------------------------------- |
+| **Single Responsibility** | Cada módulo tem uma única razão para mudar                      |
+| **Open/Closed**           | Extensível via plugins, fechado para modificação no core         |
+| **Composição > Herança** | Plugins e middlewares compõem funcionalidade                     |
+| **Fail Fast**            | Erros são detectados e reportados o mais cedo possível           |
+| **Convention over Config** | Defaults sensatos, mas tudo configurável                        |
+| **Immutable por padrão** | Objetos de configuração não são mutados após inicialização       |
+
+---
+
+## Arquitetura Geral
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         ZentJS Core                                 │
+│                                                                     │
+│  ┌────────────┐    ┌───────────┐    ┌───────────┐    ┌───────────┐  │
+│  │  Server    │───▶│  Router   │───▶│ Middleware│───▶│  Handler  │  │
+│  │ (node:http)│    │(RadixTree)│    │ Pipeline  │    │ (user fn) │  │
+│  └────────────┘    └───────────┘    └───────────┘    └───────────┘  │
+│       │                                                │            │
+│       ▼                                                ▼            │
+│  ┌───────────┐                                    ┌────────────┐    │
+│  │  Request  │                                    │  Response  │    │
+│  │ (wrapper) │◄──────── Context (ctx) ───────────▶│ (wrapper)  │    │
+│  └───────────┘                                    └────────────┘    │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────┐       │
+│  │                    Lifecycle Hooks                       │       │
+│  │  onRequest → preParsing → preValidation → preHandler     │       │
+│  │  → onSend → onResponse → onError                         │       │
+│  └──────────────────────────────────────────────────────────┘       │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────┐       │
+│  │                    Plugin System                         │       │
+│  │  register() → encapsulated scope → decorators            │       │
+│  └──────────────────────────────────────────────────────────┘       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Estrutura de Diretórios
+
+```
+zentjs/
+├── src/
+│   ├── index.mjs                 # Entry point — exporta a função zent()
+│   │
+│   ├── core/
+│   │   ├── application.mjs       # Classe Zent (instância do app)
+│   │   └── context.mjs           # Objeto de contexto por requisição
+│   │
+│   ├── http/
+│   │   ├── server.mjs            # Criação e gerenciamento do HTTP server
+│   │   ├── request.mjs           # Wrapper do IncomingMessage
+│   │   └── response.mjs          # Wrapper do ServerResponse
+│   │
+│   ├── router/
+│   │   ├── index.mjs             # Router público
+│   │   ├── radix-tree.mjs        # Implementação da Radix Tree
+│   │   └── route.mjs             # Definição de rota (método, path, handler, hooks)
+│   │
+│   ├── middleware/
+│   │   ├── pipeline.mjs          # Executor da cadeia de middlewares
+│   │   ├── body-parser.mjs       # Parser de body (JSON, URL-encoded, raw)
+│   │   └── cors.mjs              # CORS middleware built-in
+│   │
+│   ├── plugins/
+│   │   └── manager.mjs           # Registro e encapsulamento de plugins
+│   │
+│   ├── hooks/
+│   │   └── lifecycle.mjs         # Gerenciador dos lifecycle hooks
+│   │
+│   └── errors/
+│       ├── http-error.mjs        # Classe base HttpError
+│       └── error-handler.mjs     # Handler global de erros
+│
+├── test/
+│   ├── setupTests.mjs
+│   ├── unit/
+│   │   ├── router.test.mjs
+│   │   ├── radix-tree.test.mjs
+│   │   ├── middleware.test.mjs
+│   │   ├── request.test.mjs
+│   │   ├── response.test.mjs
+│   │   ├── context.test.mjs
+│   │   ├── plugins.test.mjs
+│   │   └── hooks.test.mjs
+│   └── integration/
+│       ├── server.test.mjs
+│       ├── routing.test.mjs
+│       └── error-handling.test.mjs
+│
+├── examples/
+│   ├── hello-world.mjs
+│   ├── rest-api.mjs
+│   └── with-plugins.mjs
+│
+├── package.json
+├── vitest.config.mjs
+├── eslint.config.mjs
+└── README.md
+```
+
+---
+
+## Componentes Principais
+
+### 1. Application (Zent)
+
+O ponto de entrada da framework. Cria e configura a instância do servidor.
+
+**Arquivo:** `src/core/application.mjs`
+
+**Responsabilidades:**
+
+- Inicializar o servidor HTTP
+- Registrar rotas (proxy para o Router)
+- Registrar middlewares globais
+- Registrar plugins
+- Gerenciar lifecycle hooks
+- Iniciar/parar o servidor (`listen` / `close`)
+
+**Interface:**
+
+```js
+import { zent } from 'zentjs';
+
+const app = zent({
+  // Opções de configuração
+  logger: true,            // Habilitar logging básico
+  ignoreTrailingSlash: true // /users e /users/ são a mesma rota
+});
+
+// Registrar rotas
+app.get('/hello', (ctx) => {
+  return ctx.res.json({ message: 'Hello, World!' });
+});
+
+// Iniciar servidor
+app.listen({ port: 3000, host: '0.0.0.0' }, (err, address) => {
+  if (err) throw err;
+  console.log(`Server listening on ${address}`);
+});
+```
+
+**Diagrama de classe:**
+
+```
+┌────────────────────────────────────┐
+│            Zent (Application)      │
+├────────────────────────────────────┤
+│ - _server: HttpServer              │
+│ - _router: Router                  │
+│ - _plugins: PluginManager          │
+│ - _hooks: LifecycleManager         │
+│ - _middlewares: Middleware[]        │
+│ - _options: ZentOptions            │
+├────────────────────────────────────┤
+│ + get(path, opts?, handler)        │
+│ + post(path, opts?, handler)       │
+│ + put(path, opts?, handler)        │
+│ + patch(path, opts?, handler)      │
+│ + delete(path, opts?, handler)     │
+│ + head(path, opts?, handler)       │
+│ + options(path, opts?, handler)    │
+│ + all(path, opts?, handler)        │
+│ + use(middleware)                   │
+│ + register(plugin, opts?)          │
+│ + addHook(name, fn)                │
+│ + decorate(name, value)            │
+│ + listen(opts, callback?)          │
+│ + close()                          │
+│ + inject(opts): Promise<Response>  │
+└────────────────────────────────────┘
+```
+
+> **`inject()`** permite testar rotas sem abrir uma porta de rede (inspirado no Fastify).
+
+---
+
+### 2. Router (Radix Tree)
+
+Roteamento de alta performance usando uma **Radix Tree** (também chamada Patricia Trie ou Compact Prefix Tree).
+
+**Arquivo:** `src/router/radix-tree.mjs`
+
+**Por que Radix Tree?**
+
+| Abordagem      | Complexidade (lookup) | Usado por    |
+| -------------- | --------------------- | ------------ |
+| Array linear   | O(n)                  | Express      |
+| Regex matching | O(n)                  | Koa          |
+| **Radix Tree** | **O(k)** *            | **Fastify**, **ZentJS** |
+
+*\* k = comprimento do path, independente do número de rotas*
+
+**Funcionalidades:**
+
+- Rotas estáticas: `/users/list`
+- Parâmetros nomeados: `/users/:id`
+- Wildcard: `/static/*filepath`
+- Suporte a múltiplos métodos HTTP por path
+
+**Estrutura do nó:**
+
+```js
+// Cada nó na Radix Tree
+{
+  prefix: '/users',          // Fragmento do path
+  children: Map {},          // Filhos indexados pelo primeiro caractere
+  paramChild: null,          // Filho de parâmetro (:param)
+  wildcardChild: null,       // Filho wildcard (*)
+  handlers: Map {            // Handlers por método HTTP
+    'GET': { handler, hooks, middlewares },
+    'POST': { handler, hooks, middlewares }
+  }
+}
+```
+
+**Exemplo de árvore para as rotas:**
+
+```
+GET  /users
+GET  /users/:id
+POST /users
+GET  /users/:id/posts
+GET  /about
+```
+
+```
+                    root ('')
+                    ├── /u
+                    │   └── sers
+                    │       ├── [GET, POST handlers]
+                    │       └── /:id
+                    │           ├── [GET handler]
+                    │           └── /posts
+                    │               └── [GET handler]
+                    └── /about
+                        └── [GET handler]
+```
+
+**API do Router:**
+
+```js
+class Router {
+  add(method, path, handler, opts?)   // Adiciona rota
+  find(method, path)                   // Busca rota → { handler, params, hooks }
+  all(path, handler)                   // Registra para todos os métodos HTTP
+  group(prefix, opts?, callback)       // Agrupa rotas sob prefixo
+}
+```
+
+**Route Groups:**
+
+```js
+// Grupo com prefixo + middlewares compartilhados
+router.group('/api', { middlewares: [auth] }, (group) => {
+  group.get('/users', listUsers);       // GET /api/users
+  group.post('/users', createUser);     // POST /api/users
+
+  // Sub-grupo aninhado — herda middlewares do pai
+  group.group('/admin', { middlewares: [adminOnly] }, (admin) => {
+    admin.delete('/users/:id', deleteUser); // DELETE /api/admin/users/:id
+    // middlewares executados: [auth, adminOnly]
+  });
+});
+```
+
+---
+
+### 3. Request
+
+Wrapper sobre `http.IncomingMessage` que fornece uma API mais ergonômica.
+
+**Arquivo:** `src/http/request.mjs`
+
+**Propriedades e métodos:**
+
+```js
+class ZentRequest {
+  // Propriedades parseadas do request original
+  get method()        // 'GET', 'POST', etc.
+  get url()           // URL completa
+  get path()          // Path sem query string
+  get query()         // Query params como objeto { key: value }
+  get headers()       // Headers como objeto
+  get params()        // Route params { id: '123' }
+  get ip()            // IP do cliente
+  get hostname()      // Hostname da requisição
+  get protocol()      // 'http' ou 'https'
+
+  // Body (populado após parsing)
+  get body()          // Body parseado (JSON, form, etc.)
+
+  // Helpers
+  is(type)            // Verifica Content-Type
+  get(header)         // Retorna valor de um header
+}
+```
+
+**Decisão:** O body **não** é parseado automaticamente. O usuário deve usar o middleware `bodyParser()` ou ler manualmente. Isso garante zero overhead para rotas que não precisam de body.
+
+---
+
+### 4. Response
+
+Wrapper sobre `http.ServerResponse` com API fluente (chainable).
+
+**Arquivo:** `src/http/response.mjs`
+
+**API:**
+
+```js
+class ZentResponse {
+  // Status
+  status(code)                   // Define status code → retorna this
+
+  // Headers
+  header(name, value)           // Define header → retorna this
+  type(contentType)             // Atalho para Content-Type → retorna this
+
+  // Envio de resposta
+  json(data)                    // Serializa como JSON e envia
+  send(data)                    // Envia string/Buffer
+  html(data)                    // Envia como text/html
+  redirect(url, code?)          // Redireciona (default 302)
+  empty(code?)                  // Resposta sem body (default 204)
+
+  // Propriedades
+  get sent()                    // Boolean: response já foi enviada?
+  get statusCode()              // Status code atual
+}
+```
+
+**Exemplo de uso:**
+
+```js
+app.get('/users/:id', (ctx) => {
+  const user = findUser(ctx.req.params.id);
+
+  if (!user) {
+    return ctx.res.status(404).json({ error: 'User not found' });
+  }
+
+  return ctx.res.json(user);
+});
+```
+
+---
+
+### 5. Middleware Pipeline
+
+Sistema de middlewares inspirado no Express, mas com execução baseada em `async/await`.
+
+**Arquivo:** `src/middleware/pipeline.mjs`
+
+**Signature do middleware:**
+
+```js
+// Middleware com next()
+async function myMiddleware(ctx, next) {
+  // Antes do handler
+  console.log('Before');
+
+  await next();
+
+  // Depois do handler (response já preparada)
+  console.log('After');
+}
+```
+
+**Tipos de middleware:**
+
+```
+┌──────────────────────────────────────────────────┐
+│              Middleware Pipeline                 │
+│                                                  │
+│  1. Global Middlewares      app.use(fn)          │
+│  2. Route-level Middlewares route opts           │
+│  3. Plugin-scoped           dentro de plugins    │
+│                                                  │
+│  Execução: Onion Model (como Koa)                │
+│                                                  │
+│  ┌───────────────────────────────────────────┐   │
+│  │ Middleware 1 (before)                     │   │
+│  │  ┌───────────────────────────────────┐    │   │
+│  │  │ Middleware 2 (before)             │    │   │
+│  │  │  ┌──────────────────────────┐     │    │   │
+│  │  │  │     Route Handler        │     │    │   │
+│  │  │  └──────────────────────────┘     │    │   │
+│  │  │ Middleware 2 (after)              │    │   │
+│  │  └───────────────────────────────────┘    │   │
+│  │ Middleware 1 (after)                      │   │
+│  └───────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────┘
+```
+
+**Implementação do pipeline executor:**
+
+```js
+function compose(middlewares) {
+  return function (ctx) {
+    let index = -1;
+
+    function dispatch(i) {
+      if (i <= index) {
+        return Promise.reject(new Error('next() called multiple times'));
+      }
+      index = i;
+
+      const fn = middlewares[i];
+      if (!fn) return Promise.resolve();
+
+      return Promise.resolve(fn(ctx, () => dispatch(i + 1)));
+    }
+
+    return dispatch(0);
+  };
+}
+```
+
+---
+
+### 6. Plugin System
+
+Inspirado diretamente no Fastify, com **encapsulamento de escopo**.
+
+**Arquivo:** `src/plugins/manager.mjs`
+
+**Conceito:**
+
+- Cada plugin recebe uma instância "encapsulada" do app
+- Decorators, hooks e middlewares registrados dentro de um plugin **não vazam** para o escopo pai
+- Plugins podem ter dependências e são registrados de forma assíncrona
+
+**API:**
+
+```js
+// Definir um plugin
+async function dbPlugin(app, opts) {
+  const connection = await connectDB(opts.uri);
+
+  // Decorator: adiciona propriedade à instância
+  app.decorate('db', connection);
+
+  // Hook específico do escopo
+  app.addHook('onClose', async () => {
+    await connection.close();
+  });
+}
+
+// Registrar plugin
+app.register(dbPlugin, { uri: 'mongodb://localhost/mydb' });
+```
+
+**Encapsulamento:**
+
+```
+┌─────────────────────────────────────────────┐
+│  Root Scope (app)                           │
+│  ├── global middlewares                     │
+│  ├── global hooks                           │
+│  │                                          │
+│  │  ┌────────────────────────────────────┐  │
+│  │  │  Plugin Scope A                    │  │
+│  │  │  ├── herda middlewares do pai      │  │
+│  │  │  ├── decorators locais (app.db)    │  │
+│  │  │  └── rotas locais (/api/v1/*)      │  │
+│  │  └────────────────────────────────────┘  │
+│  │                                          │
+│  │  ┌────────────────────────────────────┐  │
+│  │  │  Plugin Scope B                    │  │
+│  │  │  ├── herda middlewares do pai      │  │
+│  │  │  ├── NÃO acessa app.db (de A)      │  │
+│  │  │  └── rotas locais (/api/v2/*)      │  │
+│  │  └────────────────────────────────────┘  │
+│  │                                          │
+└─────────────────────────────────────────────┘
+```
+
+**Propriedades do Plugin Manager:**
+
+```
+┌──────────────────────────────────────┐
+│          PluginManager               │
+├──────────────────────────────────────┤
+│ - _plugins: PluginEntry[]            │
+│ - _loaded: boolean                   │
+├──────────────────────────────────────┤
+│ + register(fn, opts?)                │
+│ + load(): Promise<void>              │
+│ + createScope(parent): Zent          │
+└──────────────────────────────────────┘
+```
+
+---
+
+### 7. Lifecycle Hooks
+
+Hooks permitem interceptar diferentes fases do ciclo de vida de uma requisição.
+
+**Arquivo:** `src/hooks/lifecycle.mjs`
+
+**Hooks disponíveis (em ordem de execução):**
+
+```
+Requisição chega
+       │
+       ▼
+  ┌─────────────┐
+  │  onRequest  │ → Primeira coisa executada (logging, auth check)
+  └──────┬──────┘
+         ▼
+  ┌─────────────┐
+  │  preParsing │ → Antes de fazer parse do body
+  └──────┬──────┘
+         ▼
+  ┌───────────────┐
+  │ preValidation │ → Antes de validar o input (schema)
+  └──────┬────────┘
+         ▼
+  ┌─────────────┐
+  │  preHandler │ → Depois de validar, antes do handler
+  └──────┬──────┘
+         ▼
+  ┌─────────────┐
+  │   Handler   │ → Função do usuário
+  └──────┬──────┘
+         ▼
+  ┌─────────────┐
+  │   onSend    │ → Antes de enviar a resposta (pode modificar payload)
+  └──────┬──────┘
+         ▼
+  ┌─────────────┐
+  │  onResponse │ → Depois que a resposta foi enviada (cleanup, metrics)
+  └──────┬──────┘
+         ▼
+       Fim
+
+  ┌─────────────┐
+  │   onError   │ → Chamado quando qualquer erro ocorre (em qualquer fase)
+  └─────────────┘
+```
+
+**Signature dos hooks:**
+
+```js
+// onRequest, preParsing, preValidation, preHandler
+app.addHook('onRequest', async (ctx) => {
+  ctx.req.startTime = Date.now();
+});
+
+// onSend — pode modificar o payload
+app.addHook('onSend', async (ctx, payload) => {
+  // Retornar payload modificado
+  return payload;
+});
+
+// onResponse — chamado após envio (não pode modificar a resposta)
+app.addHook('onResponse', async (ctx) => {
+  const duration = Date.now() - ctx.req.startTime;
+  console.log(`${ctx.req.method} ${ctx.req.path} - ${duration}ms`);
+});
+
+// onError — handler de erro global
+app.addHook('onError', async (ctx, error) => {
+  console.error(error);
+});
+```
+
+---
+
+### 8. Context (ctx)
+
+Objeto criado **por requisição** que carrega todo o estado.
+
+**Arquivo:** `src/core/context.mjs`
+
+```js
+class Context {
+  constructor(req, res, app) {
+    this.req = req;       // ZentRequest
+    this.res = res;       // ZentResponse
+    this.app = app;       // Instância da aplicação
+    this.state = {};      // Espaço livre para o usuário armazenar dados
+  }
+}
+```
+
+**Uso no handler:**
+
+```js
+app.get('/dashboard', async (ctx) => {
+  // ctx.req  → Request
+  // ctx.res  → Response
+  // ctx.state → dados do middleware (ex: user autenticado)
+  // ctx.app  → instância (acesso a decorators: ctx.app.db)
+
+  const userId = ctx.state.user.id;
+  const data = await ctx.app.db.findDashboard(userId);
+
+  return ctx.res.json(data);
+});
+```
+
+---
+
+### 9. Error Handling
+
+Sistema de erros estruturado com classes customizadas e error handler global.
+
+**Arquivos:** `src/errors/http-error.mjs`, `src/errors/error-handler.mjs`
+
+**Hierarquia de erros:**
+
+```
+Error
+ └── HttpError
+      ├── BadRequestError        (400)
+      ├── UnauthorizedError      (401)
+      ├── ForbiddenError         (403)
+      ├── NotFoundError          (404)
+      ├── MethodNotAllowedError  (405)
+      ├── ConflictError          (409)
+      ├── UnprocessableEntityError (422)
+      ├── TooManyRequestsError   (429)
+      └── InternalServerError    (500)
+```
+
+**Uso:**
+
+```js
+import { NotFoundError, BadRequestError } from 'zentjs';
+
+app.get('/users/:id', async (ctx) => {
+  if (!isValidId(ctx.req.params.id)) {
+    throw new BadRequestError('Invalid user ID');
+  }
+
+  const user = await findUser(ctx.req.params.id);
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
+
+  return ctx.res.json(user);
+});
+```
+
+**Formato de resposta de erro padrão:**
+
+```json
+{
+  "statusCode": 404,
+  "error": "Not Found",
+  "message": "User not found"
+}
+```
+
+**Error handler customizado:**
+
+```js
+app.setErrorHandler((error, ctx) => {
+  // Lógica customizada
+  return ctx.res.status(error.statusCode || 500).json({
+    success: false,
+    error: error.message
+  });
+});
+```
+
+---
+
+## Fluxo de uma Requisição
+
+Diagrama completo do ciclo de vida de uma requisição HTTP no ZentJS:
+
+```
+Cliente HTTP
+     │
+     ▼
+┌──────────────────────────────────────────────────────────────┐
+│                    node:http Server                          │
+│                  (req, res) callback                         │
+└───────────────────────┬──────────────────────────────────────┘
+                        │
+                        ▼
+              ┌─────────────────┐
+              │  Criar Context  │  ZentRequest + ZentResponse
+              │  (ctx)          │  são instanciados
+              └────────┬────────┘
+                       │
+                       ▼
+              ┌──────────────────┐
+              │  onRequest hooks │  Logging, rate limiting, etc.
+              └────────┬─────────┘
+                       │
+                       ▼
+              ┌──────────────────┐
+              │  Router.find()   │  Radix Tree lookup
+              │  (method + path) │  → handler + params + route hooks
+              └────────┬─────────┘
+                       │
+              ┌────────┴──────────┐
+              │  Rota encontrada? │
+              └────┬────────┬─────┘
+                   │ Não    │ Sim
+                   ▼        ▼
+           ┌───────────┐  ┌─────────────────┐
+           │ 404 Error │  │  preParsing     │  body-parser, upload
+           └───────────┘  └───────┬─────────┘
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │  preValidation  │  schema validation
+                         └────────┬────────┘
+                                  │
+                                  ▼
+                       ┌──────────────────────┐
+                       │  Middleware Pipeline │  Global + Route middlewares
+                       │  (onion model)       │
+                       └──────────┬───────────┘
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │  preHandler     │  Última chance antes do handler
+                         └────────┬────────┘
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │  Route Handler  │  Função do usuário
+                         └────────┬────────┘
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │  onSend         │  Serialização, compressão
+                         └────────┬────────┘
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │  res.end()      │  Resposta enviada ao cliente
+                         └────────┬────────┘
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │  onResponse     │  Métricas, cleanup
+                         └─────────────────┘
+
+         ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+         Em caso de erro em qualquer fase:
+         ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+                         ┌─────────────────┐
+                         │  onError hook   │
+                         │  Error Handler  │  Formata e envia erro
+                         └─────────────────┘
+```
+
+---
+
+## API Pública
+
+### Criação da instância
+
+```js
+import { zent } from 'zentjs';
+
+const app = zent(options?);
+```
+
+**Opções:**
+
+| Opção                  | Tipo      | Default | Descrição                              |
+| ---------------------- | --------- | ------- | -------------------------------------- |
+| `logger`              | `boolean` | `false` | Logging básico de requisições          |
+| `ignoreTrailingSlash` | `boolean` | `true`  | `/foo` e `/foo/` são equivalentes       |
+| `caseSensitive`       | `boolean` | `false` | Paths case sensitive                    |
+| `maxParamLength`      | `number`  | `200`   | Comprimento máximo de route params      |
+
+### Métodos de roteamento
+
+```js
+app.get(path, [options], handler)
+app.post(path, [options], handler)
+app.put(path, [options], handler)
+app.patch(path, [options], handler)
+app.delete(path, [options], handler)
+app.head(path, [options], handler)
+app.options(path, [options], handler)
+app.all(path, [options], handler)      // Todos os métodos
+app.route(routeDefinition)             // Definição completa
+```
+
+**Route options:**
+
+```js
+app.post('/users', {
+  preHandler: [authMiddleware],   // Middlewares específicos da rota
+  onResponse: [logMiddleware],    // Hooks específicos da rota
+}, async (ctx) => {
+  // ...
+});
+```
+
+### Middleware
+
+```js
+app.use(middleware)                     // Global
+app.use('/api', middleware)             // Com prefixo
+```
+
+### Route Groups
+
+Agrupa rotas sob um prefixo compartilhado, com middlewares e hooks herdados:
+
+```js
+// Grupo simples
+app.group('/api/v1', (group) => {
+  group.get('/users', listUsers);       // GET /api/v1/users
+  group.post('/users', createUser);     // POST /api/v1/users
+  group.get('/users/:id', getUser);     // GET /api/v1/users/:id
+});
+
+// Grupo com middlewares compartilhados
+app.group('/admin', { middlewares: [authMiddleware] }, (group) => {
+  group.get('/dashboard', dashboard);   // GET /admin/dashboard (com auth)
+  group.delete('/users/:id', deleteUser);
+});
+
+// Sub-grupos aninhados (middlewares acumulam: pai → filho → rota)
+app.group('/api', { middlewares: [cors] }, (api) => {
+  api.group('/v1', { middlewares: [rateLimit] }, (v1) => {
+    v1.get('/products', listProducts);  // middlewares: [cors, rateLimit]
+  });
+  api.group('/v2', (v2) => {
+    v2.get('/products', listProductsV2); // middlewares: [cors]
+  });
+});
+```
+
+**Características:**
+
+- Prefixo aplicado automaticamente a todas as rotas do grupo
+- Middlewares do grupo executam **antes** dos middlewares da rota
+- Hooks são mesclados (grupo → rota)
+- Sub-grupos herdam middlewares/hooks dos grupos pai
+- Mesma API de conveniência (`get`, `post`, `all`, `route`, etc.)
+
+### Plugins
+
+```js
+app.register(plugin, options?)         // Registrar plugin
+app.decorate(name, value)              // Decorar instância
+app.hasDecorator(name)                 // Verificar decorator
+```
+
+### Lifecycle
+
+```js
+app.addHook(hookName, hookFunction)    // Adicionar hook
+app.setErrorHandler(handler)           // Error handler customizado
+app.setNotFoundHandler(handler)        // 404 handler customizado
+```
+
+### Servidor
+
+```js
+app.listen({ port, host }, callback?)  // Iniciar servidor
+app.close()                            // Encerrar servidor
+app.inject(requestOptions)             // Teste sem rede
+```
+
+---
+
+## Exemplos de Uso
+
+### Hello World
+
+```js
+import { zent } from 'zentjs';
+
+const app = zent();
+
+app.get('/', (ctx) => {
+  return ctx.res.json({ hello: 'world' });
+});
+
+app.listen({ port: 3000 });
+```
+
+### REST API com CRUD
+
+```js
+import { zent, bodyParser, NotFoundError } from 'zentjs';
+
+const app = zent({ logger: true });
+
+// Middleware global para parsear body
+app.use(bodyParser());
+
+// In-memory store
+const users = new Map();
+let nextId = 1;
+
+app.get('/users', (ctx) => {
+  return ctx.res.json([...users.values()]);
+});
+
+app.get('/users/:id', (ctx) => {
+  const user = users.get(Number(ctx.req.params.id));
+  if (!user) throw new NotFoundError('User not found');
+  return ctx.res.json(user);
+});
+
+app.post('/users', (ctx) => {
+  const { name, email } = ctx.req.body;
+  const user = { id: nextId++, name, email };
+  users.set(user.id, user);
+  return ctx.res.status(201).json(user);
+});
+
+app.put('/users/:id', (ctx) => {
+  const id = Number(ctx.req.params.id);
+  if (!users.has(id)) throw new NotFoundError('User not found');
+
+  const { name, email } = ctx.req.body;
+  const user = { id, name, email };
+  users.set(id, user);
+  return ctx.res.json(user);
+});
+
+app.delete('/users/:id', (ctx) => {
+  const id = Number(ctx.req.params.id);
+  if (!users.has(id)) throw new NotFoundError('User not found');
+
+  users.delete(id);
+  return ctx.res.empty();
+});
+
+app.listen({ port: 3000 });
+```
+
+### Com Plugins
+
+```js
+import { zent } from 'zentjs';
+
+// Plugin de autenticação
+async function authPlugin(app, opts) {
+  app.decorate('authenticate', async (ctx) => {
+    const token = ctx.req.get('authorization');
+    if (!token) throw new UnauthorizedError('Missing token');
+    ctx.state.user = verifyToken(token);
+  });
+
+  // Aplica hook em todas as rotas dentro deste escopo
+  app.addHook('preHandler', async (ctx) => {
+    await app.authenticate(ctx);
+  });
+}
+
+// Plugin de rotas protegidas
+async function protectedRoutes(app) {
+  // Registra o plugin de auth neste escopo
+  app.register(authPlugin);
+
+  app.get('/profile', (ctx) => {
+    return ctx.res.json(ctx.state.user);
+  });
+}
+
+// Plugin de rotas públicas
+async function publicRoutes(app) {
+  app.get('/health', (ctx) => {
+    return ctx.res.json({ status: 'ok' });
+  });
+}
+
+const app = zent();
+
+// Rotas públicas (sem auth)
+app.register(publicRoutes, { prefix: '/api' });
+
+// Rotas protegidas (com auth)
+app.register(protectedRoutes, { prefix: '/api' });
+
+app.listen({ port: 3000 });
+```
+
+### Teste com inject
+
+```js
+import { describe, it, expect } from 'vitest';
+import { zent } from 'zentjs';
+
+describe('API', () => {
+  it('should return hello world', async () => {
+    const app = zent();
+
+    app.get('/', (ctx) => {
+      return ctx.res.json({ hello: 'world' });
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/'
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ hello: 'world' });
+  });
+});
+```
+
+---
+
+## Roadmap de Implementação
+
+A implementação segue uma ordem lógica de dependências:
+
+### Fase 1 — Fundação (Core)
+
+| #  | Módulo            | Prioridade | Dependência | Descrição                                            |
+| -- | ----------------- | ---------- | ----------- | ---------------------------------------------------- |
+| 1  | `HttpError`       | Alta       | Nenhuma     | Classes de erro HTTP                                 |
+| 2  | `ZentRequest`     | Alta       | Nenhuma     | Wrapper do IncomingMessage                           |
+| 3  | `ZentResponse`    | Alta       | Nenhuma     | Wrapper do ServerResponse                            |
+| 4  | `Context`         | Alta       | 2, 3        | Objeto de contexto (req + res)                       |
+| 5  | `RadixTree`       | Alta       | Nenhuma     | Estrutura de dados para roteamento                   |
+| 6  | `Router`          | Alta       | 5           | API pública do router                                |
+
+### Fase 2 — Pipeline
+
+| #  | Módulo            | Prioridade | Dependência | Descrição                                            |
+| -- | ----------------- | ---------- | ----------- | ---------------------------------------------------- |
+| 7  | `Pipeline`        | Alta       | 4           | Executor de middlewares (compose)                    |
+| 8  | `Lifecycle`       | Alta       | 7           | Gerenciador de hooks                                 |
+| 9  | `ErrorHandler`    | Alta       | 1, 4        | Handler global de erros                              |
+
+### Fase 3 — Aplicação
+
+| #  | Módulo            | Prioridade | Dependência   | Descrição                                          |
+| -- | ----------------- | ---------- | ------------- | -------------------------------------------------- |
+| 10 | `HttpServer`      | Alta       | 4, 6, 7, 8, 9 | Servidor HTTP + request dispatch                  |
+| 11 | `Application`     | Alta       | 10            | Classe principal Zent                              |
+| 12 | `inject()`        | Média      | 10, 11        | Light-weight request injection para testes         |
+
+### Fase 4 — Plugins e Extras
+
+| #  | Módulo            | Prioridade | Dependência | Descrição                                            |
+| -- | ----------------- | ---------- | ----------- | ---------------------------------------------------- |
+| 13 | `PluginManager`   | Média      | 11          | Sistema de registro e encapsulamento de plugins      |
+| 14 | `bodyParser`      | Média      | Nenhuma     | Middleware built-in para parsing de body             |
+| 15 | `cors`            | Baixa      | Nenhuma     | Middleware built-in para CORS                        |
+
+### Fase 5 — Polish
+
+| #  | Módulo                | Prioridade | Descrição                                          |
+| -- | --------------------- | ---------- | -------------------------------------------------- |
+| 16 | Testes de integração  | Alta       | Testes end-to-end com supertest                    |
+| 17 | JSDoc + tipos         | Média      | Documentação inline e type hints                   |
+| 18 | Exemplos              | Baixa      | Exemplos na pasta `examples/`                      |
+
+---
+
+## Decisões Técnicas (ADRs)
+
+### ADR-001: ESM Only
+
+**Contexto:** Node.js suporta CommonJS e ESM.
+**Decisão:** Usar exclusivamente ESM (`.mjs` ou `"type": "module"`).
+**Motivo:** ESM é o padrão do futuro, permite top-level await, tree-shaking nativo, e importações estáticas para analysis.
+
+### ADR-002: Zero Dependências de Runtime
+
+**Contexto:** Frameworks como Express dependem de dezenas de pacotes.
+**Decisão:** Nenhuma dependência no `dependencies` do package.json.
+**Motivo:** Reduz supply chain risk, tamanho do `node_modules`, e garante total controle sobre o código.
+
+### ADR-003: Radix Tree para Roteamento
+
+**Contexto:** Express usa array linear O(n), o que não escala.
+**Decisão:** Implementar Radix Tree customizada.
+**Motivo:** Lookup em O(k) onde k = comprimento do path. Performance independente do número de rotas.
+
+### ADR-004: Context Object (ctx)
+
+**Contexto:** Express passa `(req, res, next)`, Fastify passa `(request, reply)`.
+**Decisão:** Usar um único objeto `ctx` que contém `req`, `res`, `state` e `app`.
+**Motivo:** Simplifica a signature dos handlers, facilita extensão via `state`, e permite tipagem mais clara.
+
+### ADR-005: Async-first
+
+**Contexto:** Express não trata promises automaticamente.
+**Decisão:** Todos os handlers e middlewares são tratados como async por padrão.
+**Motivo:** Elimina a necessidade de `try/catch` manual e `next(err)`. Erros em async handlers são capturados automaticamente.
+
+### ADR-006: Plugin Encapsulation
+
+**Contexto:** Em Express, todos os middlewares são globais.
+**Decisão:** Plugins criam escopos encapsulados (inspirado no Fastify).
+**Motivo:** Evita efeitos colaterais entre módulos, facilita composição de aplicações grandes.
+
+### ADR-007: Lazy Body Parsing
+
+**Contexto:** Fastify parseia body apenas quando necessário.
+**Decisão:** Body não é parseado automaticamente — exige middleware explícito.
+**Motivo:** Zero overhead para rotas que não precisam de body (GET, DELETE, health checks).
+
+---
+
+## Referências
+
+- [Node.js HTTP Module](https://nodejs.org/api/http.html)
+- [Express.js Source Code](https://github.com/expressjs/express)
+- [Fastify Architecture](https://fastify.dev/docs/latest/Reference/Architecture/)
+- [Radix Tree (Wikipedia)](https://en.wikipedia.org/wiki/Radix_tree)
+- [find-my-way (Fastify Router)](https://github.com/delvedor/find-my-way)
+- [Koa Compose (Middleware)](https://github.com/koajs/compose)
+
+---
+
+## Licença
+
+[BSD-3-Clause](LICENSE)
