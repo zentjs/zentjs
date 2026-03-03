@@ -9,8 +9,6 @@ Este diretório concentra a documentação completa do projeto, separada por tó
 - [Arquitetura](architecture.md)
 - [API pública](api.md)
 - [Guias práticos](guides.md)
-- [Roadmap e ADRs](roadmap.md)
-- [Plano incremental da documentação](DOCUMENTATION_TODO.md)
 
 ## Comece por aqui
 
