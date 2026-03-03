@@ -3,7 +3,7 @@ name: Publish to npm
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -40,6 +40,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Lint (lint-staged parity)
+        run: |
+          git add -A
+          npx lint-staged --no-stash
+          git diff --exit-code
 
       - name: Build and validate package
         run: npm run build
