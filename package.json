@@ -46,11 +46,24 @@
     "bench": "node bench/run-benchmarks.mjs",
     "bench:save-baseline": "node bench/run-benchmarks.mjs --save-baseline",
     "bench:frameworks": "node bench/frameworks-bench.mjs",
+    "prepare": "husky",
     "lint": "eslint . && prettier --check .",
     "lint:fix": "eslint . --fix && prettier --write .",
+    "commitlint": "commitlint --from=HEAD~1 --to=HEAD --verbose",
     "prepublishOnly": "npm run build"
   },
+  "lint-staged": {
+    "*.{js,mjs,cjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
   "devDependencies": {
+    "@commitlint/cli": "^20.4.2",
+    "@commitlint/config-conventional": "^20.4.2",
     "@eslint/js": "10.0.1",
     "@types/node": "^25.3.3",
     "@vitest/coverage-v8": "^4.0.18",
@@ -62,7 +75,9 @@
     "express": "^5.2.1",
     "fastify": "^5.7.4",
     "globals": "17.4.0",
+    "husky": "^9.1.7",
     "jiti": "^2.6.1",
+    "lint-staged": "^16.3.1",
     "prettier": "3.8.1",
     "supertest": "^7.2.2",
     "vitest": "4.0.18"
