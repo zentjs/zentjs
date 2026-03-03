@@ -1463,6 +1463,41 @@ describe('Application (Zent)', () => {
       expect(res.json()).toEqual({ fromGroup: true });
     });
 
+    it('should support scope.group hooks provided as arrays', async () => {
+      const app = zent();
+
+      app.register(
+        async (scope) => {
+          scope.group(
+            '/array-hooks',
+            {
+              hooks: {
+                preHandler: [
+                  async (ctx) => {
+                    ctx.state.fromArrayHook = true;
+                  },
+                ],
+              },
+            },
+            (group) => {
+              group.get('/ok', (ctx) => {
+                ctx.res.json({ fromArrayHook: ctx.state.fromArrayHook });
+              });
+            }
+          );
+        },
+        { prefix: '/api' }
+      );
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/array-hooks/ok',
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ fromArrayHook: true });
+    });
+
     it('should throw for invalid scope.use signatures', async () => {
       const app = zent();
 
