@@ -914,6 +914,22 @@ app.decorate(name, value)              // Decorar instância
 app.hasDecorator(name)                 // Verificar decorator
 ```
 
+Métrica mínima por hooks (built-in):
+
+```js
+import { requestMetrics } from 'zentjs';
+
+const metrics = requestMetrics({
+  onRecord: (record) => {
+    // { method, path, statusCode, durationMs }
+    console.log(record);
+  },
+});
+
+app.addHook('onRequest', metrics.onRequest);
+app.addHook('onResponse', metrics.onResponse);
+```
+
 ### Lifecycle
 
 ```js
@@ -945,6 +961,13 @@ node examples/with-plugins.mjs
 ```
 
 Cada exemplo sobe o servidor em `127.0.0.1:3000`.
+
+Benchmark básico (Fase 10):
+
+```bash
+npm run bench
+npm run bench:save-baseline
+```
 
 ### Hello World
 

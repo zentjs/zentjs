@@ -25,5 +25,9 @@ export { compose } from './middleware/pipeline.mjs';
 export { bodyParser } from './plugins/body-parser.mjs';
 export { cors } from './plugins/cors.mjs';
 export { PluginManager } from './plugins/manager.mjs';
+export {
+  requestMetrics,
+  requestMetricsPlugin,
+} from './plugins/request-metrics.mjs';
 export { Router } from './router/index.mjs';
 export { HttpStatus, HttpStatusText } from './utils/http-status.mjs';

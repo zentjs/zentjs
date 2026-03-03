@@ -1,0 +1,26 @@
+{
+  "generatedAt": "2026-03-03T13:49:40.620Z",
+  "node": "v24.14.0",
+  "platform": "linux",
+  "arch": "x64",
+  "cases": [
+    {
+      "name": "router_lookup_500_routes",
+      "iterations": 6000,
+      "elapsedMs": 26.39,
+      "reqPerSec": 227340.2
+    },
+    {
+      "name": "middleware_pipeline_10_layers",
+      "iterations": 4000,
+      "elapsedMs": 20.59,
+      "reqPerSec": 194263.68
+    },
+    {
+      "name": "router_param_routes",
+      "iterations": 5000,
+      "elapsedMs": 25.06,
+      "reqPerSec": 199503.77
+    }
+  ]
+}

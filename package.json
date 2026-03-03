@@ -12,6 +12,8 @@
     "test:integration": "vitest run test/integration",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
+    "bench": "node bench/run-benchmarks.mjs",
+    "bench:save-baseline": "node bench/run-benchmarks.mjs --save-baseline",
     "lint": "eslint . && prettier --check .",
     "lint:fix": "eslint . --fix && prettier --write ."
   },
