@@ -25,9 +25,37 @@ const DEFAULTS = {
 };
 
 /**
+ * @callback CorsOriginResolver
+ * @param {string} requestOrigin
+ * @returns {string|false|Promise<string|false>}
+ */
+
+/**
+ * @typedef {object} CorsOptions
+ * @property {string|string[]|CorsOriginResolver|boolean} [origin='*']
+ * @property {string|string[]} [methods='GET,HEAD,PUT,PATCH,POST,DELETE']
+ * @property {string|string[]|null} [allowedHeaders=null]
+ * @property {string|string[]|null} [exposedHeaders=null]
+ * @property {boolean} [credentials=false]
+ * @property {number|null} [maxAge=null]
+ */
+
+/**
+ * @callback MiddlewareNext
+ * @returns {void|Promise<void>}
+ */
+
+/**
+ * @callback CorsMiddleware
+ * @param {import('../core/context.mjs').Context} ctx
+ * @param {MiddlewareNext} next
+ * @returns {Promise<void>}
+ */
+
+/**
  * Resolve o valor de origin a partir da configuração.
  *
- * @param {string|string[]|Function|boolean} origin - Config de origin
+ * @param {string|string[]|CorsOriginResolver|boolean} origin - Config de origin
  * @param {string} requestOrigin - Origin do request (header)
  * @returns {Promise<string|false>} Header Access-Control-Allow-Origin ou false
  */
@@ -113,14 +141,8 @@ function setPreflightHeaders(ctx, opts) {
 /**
  * Cria o middleware CORS.
  *
- * @param {object} [opts={}]
- * @param {string|string[]|Function|boolean} [opts.origin='*'] - Origens permitidas
- * @param {string|string[]} [opts.methods='GET,HEAD,PUT,PATCH,POST,DELETE'] - Métodos permitidos
- * @param {string|string[]} [opts.allowedHeaders=null] - Headers permitidos (null = reflect)
- * @param {string|string[]} [opts.exposedHeaders=null] - Headers expostos ao browser
- * @param {boolean} [opts.credentials=false] - Permitir cookies cross-origin
- * @param {number} [opts.maxAge=null] - Cache do preflight em segundos
- * @returns {Function} Middleware (ctx, next) => Promise
+ * @param {CorsOptions} [opts={}]
+ * @returns {CorsMiddleware} Middleware (ctx, next) => Promise
  *
  * @example
  * import { cors } from 'zentjs';

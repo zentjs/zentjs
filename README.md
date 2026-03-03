@@ -113,22 +113,21 @@ zentjs/
 │   │   └── context.mjs           # Objeto de contexto por requisição
 │   │
 │   ├── http/
-│   │   ├── server.mjs            # Criação e gerenciamento do HTTP server
 │   │   ├── request.mjs           # Wrapper do IncomingMessage
 │   │   └── response.mjs          # Wrapper do ServerResponse
 │   │
 │   ├── router/
 │   │   ├── index.mjs             # Router público
+│   │   ├── node.mjs              # Nó da árvore (estático, param, wildcard)
 │   │   ├── radix-tree.mjs        # Implementação da Radix Tree
-│   │   └── route.mjs             # Definição de rota (método, path, handler, hooks)
 │   │
 │   ├── middleware/
-│   │   ├── pipeline.mjs          # Executor da cadeia de middlewares
-│   │   ├── body-parser.mjs       # Parser de body (JSON, URL-encoded, raw)
-│   │   └── cors.mjs              # CORS middleware built-in
+│   │   └── pipeline.mjs          # Executor da cadeia de middlewares
 │   │
 │   ├── plugins/
-│   │   └── manager.mjs           # Registro e encapsulamento de plugins
+│   │   ├── manager.mjs           # Registro e carregamento de plugins
+│   │   ├── body-parser.mjs       # Parser de body (JSON, URL-encoded, text)
+│   │   └── cors.mjs              # Middleware CORS built-in
 │   │
 │   ├── hooks/
 │   │   └── lifecycle.mjs         # Gerenciador dos lifecycle hooks
@@ -140,18 +139,9 @@ zentjs/
 ├── test/
 │   ├── setupTests.mjs
 │   ├── unit/
-│   │   ├── router.test.mjs
-│   │   ├── radix-tree.test.mjs
-│   │   ├── middleware.test.mjs
-│   │   ├── request.test.mjs
-│   │   ├── response.test.mjs
-│   │   ├── context.test.mjs
-│   │   ├── plugins.test.mjs
-│   │   └── hooks.test.mjs
+│   │   └── ... (13 arquivos de testes unitários)
 │   └── integration/
-│       ├── server.test.mjs
-│       ├── routing.test.mjs
-│       └── error-handling.test.mjs
+│       └── plugins-http.integration.test.mjs
 │
 ├── examples/
 │   ├── hello-world.mjs
@@ -940,6 +930,18 @@ app.inject(requestOptions)             // Teste sem rede
 
 ## Exemplos de Uso
 
+### Exemplos executáveis (Fase 5)
+
+Os exemplos abaixo já estão prontos na pasta `examples/`:
+
+```bash
+node examples/hello-world.mjs
+node examples/rest-api.mjs
+node examples/with-plugins.mjs
+```
+
+Cada exemplo sobe o servidor em `127.0.0.1:3000`.
+
 ### Hello World
 
 ```js
@@ -1121,11 +1123,18 @@ A implementação segue uma ordem lógica de dependências:
 
 ### Fase 5 — Polish
 
-| #   | Módulo               | Prioridade | Descrição                        |
-| --- | -------------------- | ---------- | -------------------------------- |
-| 16  | Testes de integração | Alta       | Testes end-to-end com supertest  |
-| 17  | JSDoc + tipos        | Média      | Documentação inline e type hints |
-| 18  | Exemplos             | Baixa      | Exemplos na pasta `examples/`    |
+| #   | Módulo               | Prioridade | Descrição                           |
+| --- | -------------------- | ---------- | ----------------------------------- |
+| 16  | Testes de integração | Alta       | Testes end-to-end HTTP reais        |
+| 17  | JSDoc + tipos        | Média      | Documentação inline e type hints    |
+| 18  | Exemplos             | Baixa      | Exemplos executáveis em `examples/` |
+
+Status atual: fases 1–5 implementadas.
+
+Métricas atuais (03/03/2026):
+
+- Testes: `322/322` passando (`14` arquivos de teste)
+- Cobertura geral: `99.62%` statements · `96.79%` branches · `100%` functions · `99.61%` lines
 
 ---
 

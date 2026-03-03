@@ -21,6 +21,23 @@ const NO_BODY_METHODS = new Set(['GET', 'HEAD', 'DELETE', 'OPTIONS']);
 const DEFAULT_LIMIT = 1024 * 1024;
 
 /**
+ * @typedef {object} BodyParserOptions
+ * @property {number} [limit=1048576] - Limite máximo do body em bytes
+ */
+
+/**
+ * @callback MiddlewareNext
+ * @returns {void|Promise<void>}
+ */
+
+/**
+ * @callback BodyParserMiddleware
+ * @param {import('../core/context.mjs').Context} ctx
+ * @param {MiddlewareNext} next
+ * @returns {Promise<void>}
+ */
+
+/**
  * Lê o body bruto da requisição como Buffer.
  * Suporta tanto streams reais (IncomingMessage) quanto
  * objetos mockados pelo inject() (que possuem rawReq.body).
@@ -28,6 +45,7 @@ const DEFAULT_LIMIT = 1024 * 1024;
  * @param {object} raw - IncomingMessage ou mock
  * @param {number} limit - Limite máximo em bytes
  * @returns {Promise<Buffer>}
+ * @throws {Error} Quando body excede o limite configurado (statusCode 413)
  */
 function readRawBody(raw, limit) {
   // inject() mock — body já é string, não é stream
@@ -78,6 +96,7 @@ function readRawBody(raw, limit) {
  * @param {Buffer} buffer - Body bruto
  * @param {string} contentType - Valor do header Content-Type
  * @returns {*} Body parseado (objeto, string ou raw)
+ * @throws {SyntaxError} Quando JSON for inválido
  */
 function parseBody(buffer, contentType) {
   const type = (contentType || '').toLowerCase();
@@ -106,9 +125,8 @@ function parseBody(buffer, contentType) {
 /**
  * Cria o middleware bodyParser.
  *
- * @param {object} [opts={}]
- * @param {number} [opts.limit=1048576] - Limite máximo do body em bytes (default: 1 MB)
- * @returns {Function} Middleware (ctx, next) => Promise
+ * @param {BodyParserOptions} [opts={}]
+ * @returns {BodyParserMiddleware} Middleware (ctx, next) => Promise
  *
  * @example
  * import { bodyParser } from 'zentjs';

@@ -1,0 +1,130 @@
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { zent } from '../../src/core/application.mjs';
+import { bodyParser } from '../../src/plugins/body-parser.mjs';
+import { cors } from '../../src/plugins/cors.mjs';
+
+describe('Integration — plugins over real HTTP', () => {
+  let app;
+
+  afterEach(async () => {
+    if (app) {
+      await app.close();
+      app = null;
+    }
+  });
+
+  it('loads plugin routes before listen and parses JSON body', async () => {
+    app = zent();
+
+    app.register(
+      async (scope) => {
+        scope.use(bodyParser());
+        scope.use(
+          cors({
+            origin: 'http://client.local',
+            credentials: true,
+          })
+        );
+
+        scope.post('/echo', (ctx) => {
+          ctx.res.json({
+            body: ctx.req.body,
+            origin: ctx.req.get('origin') || null,
+          });
+        });
+      },
+      { prefix: '/api' }
+    );
+
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+
+    const response = await fetch(`${address}/api/echo`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'http://client.local',
+      },
+      body: JSON.stringify({ ok: true, n: 1 }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('access-control-allow-origin')).toBe(
+      'http://client.local'
+    );
+    expect(response.headers.get('access-control-allow-credentials')).toBe(
+      'true'
+    );
+
+    const payload = await response.json();
+    expect(payload).toEqual({
+      body: { ok: true, n: 1 },
+      origin: 'http://client.local',
+    });
+  });
+
+  it('handles CORS preflight over network', async () => {
+    app = zent();
+
+    app.use(
+      cors({
+        origin: ['http://client.local'],
+        methods: ['GET', 'POST'],
+        allowedHeaders: ['content-type', 'authorization'],
+        maxAge: 600,
+      })
+    );
+
+    app.options('/items', (ctx) => {
+      ctx.res.empty(204);
+    });
+
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+
+    const response = await fetch(`${address}/items`, {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'http://client.local',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type,authorization',
+      },
+    });
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get('access-control-allow-origin')).toBe(
+      'http://client.local'
+    );
+    expect(response.headers.get('access-control-allow-methods')).toBe(
+      'GET, POST'
+    );
+    expect(response.headers.get('access-control-allow-headers')).toBe(
+      'content-type, authorization'
+    );
+    expect(response.headers.get('access-control-max-age')).toBe('600');
+  });
+
+  it('supports nested plugin prefixes over network', async () => {
+    app = zent();
+
+    app.register(
+      async (scope) => {
+        scope.register(
+          async (innerScope) => {
+            innerScope.get('/health', (ctx) => {
+              ctx.res.json({ ok: true });
+            });
+          },
+          { prefix: '/v1' }
+        );
+      },
+      { prefix: '/api' }
+    );
+
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+
+    const response = await fetch(`${address}/api/v1/health`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+  });
+});

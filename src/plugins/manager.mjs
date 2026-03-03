@@ -12,8 +12,21 @@
 
 /**
  * @typedef {object} PluginEntry
- * @property {Function} fn - Função do plugin: async (app, opts) => {}
+ * @property {PluginFunction} fn - Função do plugin
  * @property {object} opts - Opções passadas ao plugin
+ */
+
+/**
+ * @callback PluginFunction
+ * @param {object} app - Escopo encapsulado com API do app
+ * @param {object} opts - Opções recebidas no register
+ * @returns {void|Promise<void>}
+ */
+
+/**
+ * @callback CreateScopeFunction
+ * @param {object} opts - Opções do plugin atual
+ * @returns {object} Escopo encapsulado para o plugin
  */
 
 /**
@@ -43,7 +56,7 @@ export class PluginManager {
   /**
    * Registra um plugin para ser carregado posteriormente.
    *
-   * @param {Function} fn - async (app, opts) => {}
+   * @param {PluginFunction} fn - async (app, opts) => {}
    * @param {object} [opts={}] - Opções do plugin (prefix, etc.)
    * @throws {TypeError} Se fn não for uma função
    * @throws {Error} Se plugins já foram carregados
@@ -67,7 +80,7 @@ export class PluginManager {
    * Carrega todos os plugins registrados sequencialmente.
    * Cada plugin recebe uma instância encapsulada via `createScope`.
    *
-   * @param {Function} createScope - (opts) => encapsulatedApp
+   * @param {CreateScopeFunction} createScope - (opts) => encapsulatedApp
    * @throws {TypeError} Se createScope não for uma função
    * @throws {Error} Se já foi carregado anteriormente
    */
