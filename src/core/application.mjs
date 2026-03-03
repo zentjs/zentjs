@@ -31,6 +31,9 @@ const HTTP_METHODS = [
 const SCOPE_DECORATORS = Symbol('scopeDecorators');
 const SCOPE_MIDDLEWARES = Symbol('scopeMiddlewares');
 const SCOPE_HOOKS = Symbol('scopeHooks');
+const ROUTE_HOOKS = Symbol('routeHooks');
+const ROUTE_MIDDLEWARES = Symbol('routeMiddlewares');
+const ROUTE_PIPELINE_CACHE = Symbol('routePipelineCache');
 
 /**
  * Cria um registro de decorators com herança por escopo.
@@ -99,6 +102,47 @@ function mergeHooksMap(baseHooks, extraHooks) {
 function toMiddlewareArray(middlewares) {
   if (!middlewares) return [];
   return Array.isArray(middlewares) ? middlewares : [middlewares];
+}
+
+/**
+ * Normaliza hooks de rota para arrays por fase.
+ * @param {object | null | undefined} hooks
+ * @returns {Record<string, Function[]>}
+ */
+function normalizeRouteHooks(hooks) {
+  const normalized = {};
+
+  if (!hooks) return normalized;
+
+  for (const phase of HOOK_PHASES) {
+    const phaseHooks = hooks[phase];
+    if (!phaseHooks) continue;
+    normalized[phase] = Array.isArray(phaseHooks) ? phaseHooks : [phaseHooks];
+  }
+
+  return normalized;
+}
+
+/**
+ * Compila definição de rota para reduzir custo no hot path.
+ * @param {object} definition
+ * @returns {object}
+ */
+function compileRouteDefinition(definition) {
+  const routeMiddlewares = toMiddlewareArray(definition.middlewares);
+  const normalizedHooks = normalizeRouteHooks(definition.hooks);
+
+  return {
+    ...definition,
+    middlewares: routeMiddlewares,
+    hooks: normalizedHooks,
+    [ROUTE_MIDDLEWARES]: routeMiddlewares,
+    [ROUTE_HOOKS]: normalizedHooks,
+    [ROUTE_PIPELINE_CACHE]: {
+      version: -1,
+      pipeline: null,
+    },
+  };
 }
 
 /**
@@ -179,6 +223,9 @@ export class Zent {
   /** @type {PluginManager} */
   #plugins;
 
+  /** @type {number} */
+  #middlewareVersion;
+
   /** @type {((ctx: Context) => void | Promise<void>) | null} */
   #notFoundHandler;
 
@@ -199,6 +246,7 @@ export class Zent {
     this.#decorators = {};
     this.#plugins = new PluginManager();
     this.#notFoundHandler = null;
+    this.#middlewareVersion = 0;
   }
 
   // ─── Routing ──────────────────────────────────────────
@@ -208,7 +256,7 @@ export class Zent {
    * @param {object} definition
    */
   route(definition) {
-    this.#router.route(definition);
+    this.#router.route(compileRouteDefinition(definition));
     return this;
   }
 
@@ -244,6 +292,7 @@ export class Zent {
   use(arg1, arg2) {
     if (typeof arg1 === 'function' && arg2 === undefined) {
       this.#middlewares.push(arg1);
+      this.#middlewareVersion++;
       return this;
     }
 
@@ -257,6 +306,8 @@ export class Zent {
 
         return arg2(ctx, next);
       });
+
+      this.#middlewareVersion++;
 
       return this;
     }
@@ -729,9 +780,6 @@ export class Zent {
       await this.#runRouteHooks(route, 'preValidation', ctx);
 
       // 6. Montar pipeline: global middlewares + route middlewares + handler
-      const routeMiddlewares = route.middlewares || [];
-      const allMiddlewares = [...this.#middlewares, ...routeMiddlewares];
-
       // 7. preHandler hooks (executados dentro do pipeline, antes do handler)
       const handler = async (ctx) => {
         await this.#lifecycle.run('preHandler', ctx);
@@ -741,7 +789,7 @@ export class Zent {
       };
 
       // 8. Execute pipeline
-      const pipeline = compose(allMiddlewares);
+      const pipeline = this.#getRoutePipeline(route);
       await pipeline(ctx, handler);
 
       // 8.1 onSend + envio automático para payload retornado pelo handler
@@ -786,11 +834,12 @@ export class Zent {
    * @returns {Promise<void>}
    */
   async #runRouteHooks(route, phase, ctx, ...args) {
-    if (!route?.hooks?.[phase]) return;
+    if (route) {
+      this.#ensureCompiledRoute(route);
+    }
 
-    const hooks = Array.isArray(route.hooks[phase])
-      ? route.hooks[phase]
-      : [route.hooks[phase]];
+    const hooks = route?.[ROUTE_HOOKS]?.[phase];
+    if (!hooks || hooks.length === 0) return;
 
     for (const hook of hooks) {
       await hook(ctx, ...args);
@@ -805,11 +854,12 @@ export class Zent {
    * @returns {Promise<*>}
    */
   async #runRouteOnSendHooks(route, ctx, payload) {
-    if (!route?.hooks?.onSend) return payload;
+    if (route) {
+      this.#ensureCompiledRoute(route);
+    }
 
-    const hooks = Array.isArray(route.hooks.onSend)
-      ? route.hooks.onSend
-      : [route.hooks.onSend];
+    const hooks = route?.[ROUTE_HOOKS]?.onSend;
+    if (!hooks || hooks.length === 0) return payload;
 
     let current = payload;
 
@@ -821,6 +871,58 @@ export class Zent {
     }
 
     return current;
+  }
+
+  /**
+   * Retorna pipeline compilado por rota com cache por versão de middlewares globais.
+   * @param {object} route
+   * @returns {(ctx: object, finalHandler?: Function) => Promise<void>}
+   */
+  #getRoutePipeline(route) {
+    this.#ensureCompiledRoute(route);
+
+    const cache = route[ROUTE_PIPELINE_CACHE];
+
+    if (cache && cache.version === this.#middlewareVersion && cache.pipeline) {
+      return cache.pipeline;
+    }
+
+    const routeMiddlewares = route[ROUTE_MIDDLEWARES] || [];
+    const allMiddlewares = [...this.#middlewares, ...routeMiddlewares];
+    const pipeline = compose(allMiddlewares);
+
+    route[ROUTE_PIPELINE_CACHE] = {
+      version: this.#middlewareVersion,
+      pipeline,
+    };
+
+    return pipeline;
+  }
+
+  /**
+   * Garante metadados compilados para rotas não compiladas previamente.
+   * @param {object} route
+   */
+  #ensureCompiledRoute(route) {
+    if (
+      route[ROUTE_HOOKS] &&
+      route[ROUTE_MIDDLEWARES] &&
+      route[ROUTE_PIPELINE_CACHE]
+    ) {
+      return;
+    }
+
+    const routeMiddlewares = toMiddlewareArray(route.middlewares);
+    const normalizedHooks = normalizeRouteHooks(route.hooks);
+
+    route.middlewares = routeMiddlewares;
+    route.hooks = normalizedHooks;
+    route[ROUTE_MIDDLEWARES] = routeMiddlewares;
+    route[ROUTE_HOOKS] = normalizedHooks;
+    route[ROUTE_PIPELINE_CACHE] = {
+      version: -1,
+      pipeline: null,
+    };
   }
 
   /**

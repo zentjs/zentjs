@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-03T14:03:24.909Z",
+  "generatedAt": "2026-03-03T14:20:23.088Z",
   "node": "v24.14.0",
   "scenarios": [
     {
@@ -8,10 +8,10 @@
         {
           "framework": "zent",
           "scenario": "static_get",
-          "reqPerSec": 12532,
-          "latencyMsAvg": 3.49,
-          "latencyMsP99": 6,
-          "throughputBytesPerSec": 2493747.21,
+          "reqPerSec": 14516,
+          "latencyMsAvg": 3.14,
+          "latencyMsP99": 4,
+          "throughputBytesPerSec": 2888704,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0
@@ -19,10 +19,10 @@
         {
           "framework": "fastify",
           "scenario": "static_get",
-          "reqPerSec": 17263.2,
-          "latencyMsAvg": 2.32,
-          "latencyMsP99": 4,
-          "throughputBytesPerSec": 3142246.4,
+          "reqPerSec": 19035.2,
+          "latencyMsAvg": 2.07,
+          "latencyMsP99": 3,
+          "throughputBytesPerSec": 3464601.6,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0
@@ -30,10 +30,10 @@
         {
           "framework": "express",
           "scenario": "static_get",
-          "reqPerSec": 10805.6,
-          "latencyMsAvg": 4.21,
-          "latencyMsP99": 6,
-          "throughputBytesPerSec": 2646630.4,
+          "reqPerSec": 12445.6,
+          "latencyMsAvg": 3.31,
+          "latencyMsP99": 5,
+          "throughputBytesPerSec": 3049267.2,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0
@@ -46,10 +46,10 @@
         {
           "framework": "zent",
           "scenario": "param_get",
-          "reqPerSec": 13101.6,
-          "latencyMsAvg": 3.28,
-          "latencyMsP99": 5,
-          "throughputBytesPerSec": 2620006.4,
+          "reqPerSec": 14986.4,
+          "latencyMsAvg": 3.02,
+          "latencyMsP99": 3,
+          "throughputBytesPerSec": 2996838.4,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0
@@ -57,10 +57,10 @@
         {
           "framework": "fastify",
           "scenario": "param_get",
-          "reqPerSec": 17230.41,
-          "latencyMsAvg": 2.27,
-          "latencyMsP99": 4,
-          "throughputBytesPerSec": 3152486.4,
+          "reqPerSec": 19051.2,
+          "latencyMsAvg": 2.03,
+          "latencyMsP99": 3,
+          "throughputBytesPerSec": 3486310.4,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0
@@ -68,10 +68,10 @@
         {
           "framework": "express",
           "scenario": "param_get",
-          "reqPerSec": 10970.4,
-          "latencyMsAvg": 4.17,
-          "latencyMsP99": 6,
-          "throughputBytesPerSec": 2699059.2,
+          "reqPerSec": 12349.6,
+          "latencyMsAvg": 3.44,
+          "latencyMsP99": 5,
+          "throughputBytesPerSec": 3038208,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0
@@ -84,10 +84,10 @@
         {
           "framework": "zent",
           "scenario": "json_post",
-          "reqPerSec": 11220,
-          "latencyMsAvg": 4.09,
-          "latencyMsP99": 5,
-          "throughputBytesPerSec": 2479513.6,
+          "reqPerSec": 12866.4,
+          "latencyMsAvg": 3.23,
+          "latencyMsP99": 4,
+          "throughputBytesPerSec": 2843238.4,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0
@@ -95,10 +95,10 @@
         {
           "framework": "fastify",
           "scenario": "json_post",
-          "reqPerSec": 11066.4,
-          "latencyMsAvg": 4,
-          "latencyMsP99": 10,
-          "throughputBytesPerSec": 2246348.8,
+          "reqPerSec": 12565.6,
+          "latencyMsAvg": 3.34,
+          "latencyMsP99": 9,
+          "throughputBytesPerSec": 2550784,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0
@@ -106,10 +106,10 @@
         {
           "framework": "express",
           "scenario": "json_post",
-          "reqPerSec": 8946.4,
-          "latencyMsAvg": 5.2,
-          "latencyMsP99": 7,
-          "throughputBytesPerSec": 2388582.4,
+          "reqPerSec": 10160.8,
+          "latencyMsAvg": 4.27,
+          "latencyMsP99": 6,
+          "throughputBytesPerSec": 2712985.6,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0

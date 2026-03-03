@@ -37,11 +37,12 @@ export class Router {
    * @param {Function[]} [definition.middlewares]
    * @param {object} [definition.hooks]
    */
-  route({ method, path, handler, middlewares = [], hooks = {} }) {
+  route({ method, path, handler, middlewares = [], hooks = {}, ...meta }) {
     this.#tree.add(method.toUpperCase(), path, {
       handler,
       middlewares,
       hooks,
+      ...meta,
     });
   }
 
