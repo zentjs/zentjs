@@ -11,8 +11,6 @@ import {
  * Cria um ctx mock mínimo com res que registra as chamadas.
  */
 function createMockCtx() {
-  const written = {};
-
   const res = {
     _statusCode: null,
     _body: null,
@@ -134,7 +132,7 @@ describe('ErrorHandler', () => {
 
     it('should normalize error before passing to custom handler', async () => {
       const eh = new ErrorHandler();
-      const { ctx, res } = createMockCtx();
+      const { ctx } = createMockCtx();
       let receivedError;
 
       eh.setErrorHandler((err) => {

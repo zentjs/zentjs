@@ -607,4 +607,344 @@ describe('Application (Zent)', () => {
       expect(order).toEqual(['route-hook', 'handler']);
     });
   });
+
+  // ─── Plugins (register / createScope / loadPlugins) ─────
+
+  describe('register() — plugins', () => {
+    it('should return this for chaining', () => {
+      const app = zent();
+      const result = app.register(async () => {});
+
+      expect(result).toBe(app);
+    });
+
+    it('should chain multiple register calls', () => {
+      const app = zent();
+      const result = app.register(async () => {}).register(async () => {});
+
+      expect(result).toBe(app);
+    });
+
+    it('should load plugins on inject()', async () => {
+      const order = [];
+      const app = zent();
+
+      app.register(async (scope) => {
+        order.push('plugin-loaded');
+        scope.get('/hello', (ctx) => ctx.res.json({ ok: true }));
+      });
+
+      app.get('/root', (ctx) => ctx.res.json({ root: true }));
+
+      // inject() triggers #loadPlugins
+      const res = await app.inject({ method: 'GET', url: '/hello' });
+
+      expect(order).toEqual(['plugin-loaded']);
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ ok: true });
+    });
+
+    it('should prefix plugin routes with opts.prefix', async () => {
+      const app = zent();
+
+      app.register(
+        async (scope) => {
+          scope.get('/items', (ctx) => ctx.res.json({ items: [] }));
+        },
+        { prefix: '/api' }
+      );
+
+      const res = await app.inject({ method: 'GET', url: '/api/items' });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ items: [] });
+    });
+
+    it('should support all HTTP method shortcuts in scope', async () => {
+      const app = zent();
+
+      app.register(
+        async (scope) => {
+          scope.get('/r', (ctx) => ctx.res.json({ m: 'GET' }));
+          scope.post('/r', (ctx) => ctx.res.json({ m: 'POST' }));
+          scope.put('/r', (ctx) => ctx.res.json({ m: 'PUT' }));
+          scope.patch('/r', (ctx) => ctx.res.json({ m: 'PATCH' }));
+          scope.delete('/r', (ctx) => ctx.res.json({ m: 'DELETE' }));
+          scope.head('/r', (ctx) => ctx.res.status(204).send(''));
+          scope.options('/r', (ctx) => ctx.res.status(204).send(''));
+        },
+        { prefix: '/v1' }
+      );
+
+      const get = await app.inject({ method: 'GET', url: '/v1/r' });
+      expect(get.json().m).toBe('GET');
+
+      const post = await app.inject({ method: 'POST', url: '/v1/r' });
+      expect(post.json().m).toBe('POST');
+
+      const put = await app.inject({ method: 'PUT', url: '/v1/r' });
+      expect(put.json().m).toBe('PUT');
+
+      const patch = await app.inject({ method: 'PATCH', url: '/v1/r' });
+      expect(patch.json().m).toBe('PATCH');
+
+      const del = await app.inject({ method: 'DELETE', url: '/v1/r' });
+      expect(del.json().m).toBe('DELETE');
+
+      const head = await app.inject({ method: 'HEAD', url: '/v1/r' });
+      expect(head.statusCode).toBe(204);
+
+      const opts = await app.inject({ method: 'OPTIONS', url: '/v1/r' });
+      expect(opts.statusCode).toBe(204);
+    });
+
+    it('should support scope.all() with prefix', async () => {
+      const app = zent();
+
+      app.register(
+        async (scope) => {
+          scope.all('/any', (ctx) => ctx.res.json({ ok: true }));
+        },
+        { prefix: '/p' }
+      );
+
+      const res = await app.inject({ method: 'PATCH', url: '/p/any' });
+      expect(res.json()).toEqual({ ok: true });
+    });
+
+    it('should support scope.route() with prefix', async () => {
+      const app = zent();
+
+      app.register(
+        async (scope) => {
+          scope.route({
+            method: 'GET',
+            path: '/custom',
+            handler: (ctx) => ctx.res.json({ route: true }),
+          });
+        },
+        { prefix: '/scoped' }
+      );
+
+      const res = await app.inject({ method: 'GET', url: '/scoped/custom' });
+      expect(res.json()).toEqual({ route: true });
+    });
+
+    it('should support scope.group() with prefix', async () => {
+      const app = zent();
+
+      app.register(
+        async (scope) => {
+          scope.group('/sub', (router) => {
+            router.get('/item', (ctx) => ctx.res.json({ grouped: true }));
+          });
+        },
+        { prefix: '/ns' }
+      );
+
+      const res = await app.inject({ method: 'GET', url: '/ns/sub/item' });
+      expect(res.json()).toEqual({ grouped: true });
+    });
+
+    it('should allow plugin to add middleware via scope.use()', async () => {
+      const app = zent();
+      const order = [];
+
+      app.register(async (scope) => {
+        scope.use(async (ctx, next) => {
+          order.push('plugin-mw');
+          await next(ctx);
+        });
+      });
+
+      app.get('/x', (ctx) => {
+        order.push('handler');
+        ctx.res.json({});
+      });
+
+      await app.inject({ method: 'GET', url: '/x' });
+
+      expect(order).toEqual(['plugin-mw', 'handler']);
+    });
+
+    it('should allow plugin to add hooks via scope.addHook()', async () => {
+      const app = zent();
+      const order = [];
+
+      app.register(async (scope) => {
+        scope.addHook('onRequest', async () => {
+          order.push('plugin-hook');
+        });
+      });
+
+      app.get('/h', (ctx) => {
+        order.push('handler');
+        ctx.res.json({});
+      });
+
+      await app.inject({ method: 'GET', url: '/h' });
+
+      expect(order).toEqual(['plugin-hook', 'handler']);
+    });
+
+    it('should allow plugin to set error handler via scope.setErrorHandler()', async () => {
+      const app = zent();
+
+      app.register(async (scope) => {
+        scope.setErrorHandler((err, ctx) => {
+          ctx.res.status(599).json({ custom: true });
+        });
+      });
+
+      app.get('/fail', () => {
+        throw new Error('boom');
+      });
+
+      const res = await app.inject({ method: 'GET', url: '/fail' });
+
+      expect(res.statusCode).toBe(599);
+      expect(res.json()).toEqual({ custom: true });
+    });
+
+    it('should allow plugin to decorate via scope.decorate()', async () => {
+      const app = zent();
+
+      app.register(async (scope) => {
+        scope.decorate('dbClient', { query: () => 'result' });
+      });
+
+      app.get('/dec', (ctx) => {
+        ctx.res.json({ has: ctx.app.hasDecorator('dbClient') });
+      });
+
+      const res = await app.inject({ method: 'GET', url: '/dec' });
+
+      expect(res.json()).toEqual({ has: true });
+    });
+
+    it('should allow plugin to check decorator via scope.hasDecorator()', async () => {
+      const app = zent();
+      let result;
+
+      app.register(async (scope) => {
+        scope.decorate('myDec', 42);
+        result = scope.hasDecorator('myDec');
+      });
+
+      await app.inject({ method: 'GET', url: '/' }).catch(() => {});
+
+      expect(result).toBe(true);
+    });
+
+    it('should support nested register with prefix accumulation', async () => {
+      const app = zent();
+
+      app.register(
+        async (scope) => {
+          scope.register(
+            async (innerScope) => {
+              innerScope.get('/list', (ctx) => ctx.res.json({ nested: true }));
+            },
+            { prefix: '/v2' }
+          );
+        },
+        { prefix: '/api' }
+      );
+
+      const res = await app.inject({ method: 'GET', url: '/api/v2/list' });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ nested: true });
+    });
+
+    it('should support nested register without inner prefix', async () => {
+      const app = zent();
+
+      app.register(
+        async (scope) => {
+          scope.register(async (innerScope) => {
+            innerScope.get('/flat', (ctx) => ctx.res.json({ flat: true }));
+          });
+        },
+        { prefix: '/base' }
+      );
+
+      const res = await app.inject({ method: 'GET', url: '/base/flat' });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ flat: true });
+    });
+
+    it('should load plugins only once (idempotent)', async () => {
+      const app = zent();
+      let count = 0;
+
+      app.register(async () => {
+        count++;
+      });
+
+      await app.inject({ method: 'GET', url: '/' }).catch(() => {});
+      await app.inject({ method: 'GET', url: '/' }).catch(() => {});
+
+      expect(count).toBe(1);
+    });
+
+    it('should pass plugin opts to plugin function', async () => {
+      const app = zent();
+      let receivedOpts;
+
+      app.register(
+        async (scope, opts) => {
+          receivedOpts = opts;
+        },
+        { prefix: '/api', custom: 'value' }
+      );
+
+      await app.inject({ method: 'GET', url: '/' }).catch(() => {});
+
+      expect(receivedOpts).toEqual({ prefix: '/api', custom: 'value' });
+    });
+
+    it('should register plugin without prefix (empty string default)', async () => {
+      const app = zent();
+
+      app.register(async (scope) => {
+        scope.get('/no-prefix', (ctx) => ctx.res.json({ ok: true }));
+      });
+
+      const res = await app.inject({ method: 'GET', url: '/no-prefix' });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ ok: true });
+    });
+
+    it('should propagate plugin errors during load', async () => {
+      const app = zent();
+
+      app.register(async () => {
+        throw new Error('plugin init failed');
+      });
+
+      await expect(app.inject({ method: 'GET', url: '/' })).rejects.toThrow(
+        'plugin init failed'
+      );
+    });
+
+    it('should load plugins before listen()', async () => {
+      const app = zent();
+      let loaded = false;
+
+      app.register(async (scope) => {
+        loaded = true;
+        scope.get('/after-load', (ctx) => ctx.res.json({ loaded: true }));
+      });
+
+      const address = await app.listen({ port: 0 });
+
+      expect(loaded).toBe(true);
+      expect(address).toContain('http://');
+
+      await app.close();
+    });
+  });
 });

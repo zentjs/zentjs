@@ -37,10 +37,10 @@
 **ZentJS** é uma framework HTTP para construção de APIs e aplicações web em Node.js.
 O objetivo é combinar o melhor dos dois mundos:
 
-| Inspiração    | O que trazemos                                              |
-| ------------- | ----------------------------------------------------------- |
-| **Express**   | API simples e intuitiva, middleware `(req, res, next)`       |
-| **Fastify**   | Performance, sistema de plugins com encapsulamento, hooks de ciclo de vida |
+| Inspiração  | O que trazemos                                                             |
+| ----------- | -------------------------------------------------------------------------- |
+| **Express** | API simples e intuitiva, middleware `(req, res, next)`                     |
+| **Fastify** | Performance, sistema de plugins com encapsulamento, hooks de ciclo de vida |
 
 O resultado é uma framework leve, sem dependências de runtime, construída 100% sobre o módulo nativo `node:http`.
 
@@ -58,14 +58,14 @@ O resultado é uma framework leve, sem dependências de runtime, construída 100
 
 ### Princípios Arquiteturais
 
-| Princípio               | Descrição                                                         |
-| ------------------------ | ----------------------------------------------------------------- |
-| **Single Responsibility** | Cada módulo tem uma única razão para mudar                      |
-| **Open/Closed**           | Extensível via plugins, fechado para modificação no core         |
-| **Composição > Herança** | Plugins e middlewares compõem funcionalidade                     |
-| **Fail Fast**            | Erros são detectados e reportados o mais cedo possível           |
-| **Convention over Config** | Defaults sensatos, mas tudo configurável                        |
-| **Immutable por padrão** | Objetos de configuração não são mutados após inicialização       |
+| Princípio                  | Descrição                                                  |
+| -------------------------- | ---------------------------------------------------------- |
+| **Single Responsibility**  | Cada módulo tem uma única razão para mudar                 |
+| **Open/Closed**            | Extensível via plugins, fechado para modificação no core   |
+| **Composição > Herança**   | Plugins e middlewares compõem funcionalidade               |
+| **Fail Fast**              | Erros são detectados e reportados o mais cedo possível     |
+| **Convention over Config** | Defaults sensatos, mas tudo configurável                   |
+| **Immutable por padrão**   | Objetos de configuração não são mutados após inicialização |
 
 ---
 
@@ -190,8 +190,8 @@ import { zent } from 'zentjs';
 
 const app = zent({
   // Opções de configuração
-  logger: true,            // Habilitar logging básico
-  ignoreTrailingSlash: true // /users e /users/ são a mesma rota
+  logger: true, // Habilitar logging básico
+  ignoreTrailingSlash: true, // /users e /users/ são a mesma rota
 });
 
 // Registrar rotas
@@ -249,13 +249,13 @@ Roteamento de alta performance usando uma **Radix Tree** (também chamada Patric
 
 **Por que Radix Tree?**
 
-| Abordagem      | Complexidade (lookup) | Usado por    |
-| -------------- | --------------------- | ------------ |
-| Array linear   | O(n)                  | Express      |
-| Regex matching | O(n)                  | Koa          |
-| **Radix Tree** | **O(k)** *            | **Fastify**, **ZentJS** |
+| Abordagem      | Complexidade (lookup) | Usado por               |
+| -------------- | --------------------- | ----------------------- |
+| Array linear   | O(n)                  | Express                 |
+| Regex matching | O(n)                  | Koa                     |
+| **Radix Tree** | **O(k)** \*           | **Fastify**, **ZentJS** |
 
-*\* k = comprimento do path, independente do número de rotas*
+_\* k = comprimento do path, independente do número de rotas_
 
 **Funcionalidades:**
 
@@ -319,8 +319,8 @@ class Router {
 ```js
 // Grupo com prefixo + middlewares compartilhados
 router.group('/api', { middlewares: [auth] }, (group) => {
-  group.get('/users', listUsers);       // GET /api/users
-  group.post('/users', createUser);     // POST /api/users
+  group.get('/users', listUsers); // GET /api/users
+  group.post('/users', createUser); // POST /api/users
 
   // Sub-grupo aninhado — herda middlewares do pai
   group.group('/admin', { middlewares: [adminOnly] }, (admin) => {
@@ -643,10 +643,10 @@ Objeto criado **por requisição** que carrega todo o estado.
 ```js
 class Context {
   constructor(req, res, app) {
-    this.req = req;       // ZentRequest
-    this.res = res;       // ZentResponse
-    this.app = app;       // Instância da aplicação
-    this.state = {};      // Espaço livre para o usuário armazenar dados
+    this.req = req; // ZentRequest
+    this.res = res; // ZentResponse
+    this.app = app; // Instância da aplicação
+    this.state = {}; // Espaço livre para o usuário armazenar dados
   }
 }
 ```
@@ -727,7 +727,7 @@ app.setErrorHandler((error, ctx) => {
   // Lógica customizada
   return ctx.res.status(error.statusCode || 500).json({
     success: false,
-    error: error.message
+    error: error.message,
   });
 });
 ```
@@ -832,43 +832,47 @@ const app = zent(options?);
 
 **Opções:**
 
-| Opção                  | Tipo      | Default | Descrição                              |
-| ---------------------- | --------- | ------- | -------------------------------------- |
-| `logger`              | `boolean` | `false` | Logging básico de requisições          |
-| `ignoreTrailingSlash` | `boolean` | `true`  | `/foo` e `/foo/` são equivalentes       |
-| `caseSensitive`       | `boolean` | `false` | Paths case sensitive                    |
-| `maxParamLength`      | `number`  | `200`   | Comprimento máximo de route params      |
+| Opção                 | Tipo      | Default | Descrição                          |
+| --------------------- | --------- | ------- | ---------------------------------- |
+| `logger`              | `boolean` | `false` | Logging básico de requisições      |
+| `ignoreTrailingSlash` | `boolean` | `true`  | `/foo` e `/foo/` são equivalentes  |
+| `caseSensitive`       | `boolean` | `false` | Paths case sensitive               |
+| `maxParamLength`      | `number`  | `200`   | Comprimento máximo de route params |
 
 ### Métodos de roteamento
 
 ```js
-app.get(path, [options], handler)
-app.post(path, [options], handler)
-app.put(path, [options], handler)
-app.patch(path, [options], handler)
-app.delete(path, [options], handler)
-app.head(path, [options], handler)
-app.options(path, [options], handler)
-app.all(path, [options], handler)      // Todos os métodos
-app.route(routeDefinition)             // Definição completa
+app.get(path, [options], handler);
+app.post(path, [options], handler);
+app.put(path, [options], handler);
+app.patch(path, [options], handler);
+app.delete(path, [options], handler);
+app.head(path, [options], handler);
+app.options(path, [options], handler);
+app.all(path, [options], handler); // Todos os métodos
+app.route(routeDefinition); // Definição completa
 ```
 
 **Route options:**
 
 ```js
-app.post('/users', {
-  preHandler: [authMiddleware],   // Middlewares específicos da rota
-  onResponse: [logMiddleware],    // Hooks específicos da rota
-}, async (ctx) => {
-  // ...
-});
+app.post(
+  '/users',
+  {
+    preHandler: [authMiddleware], // Middlewares específicos da rota
+    onResponse: [logMiddleware], // Hooks específicos da rota
+  },
+  async (ctx) => {
+    // ...
+  }
+);
 ```
 
 ### Middleware
 
 ```js
-app.use(middleware)                     // Global
-app.use('/api', middleware)             // Com prefixo
+app.use(middleware); // Global
+app.use('/api', middleware); // Com prefixo
 ```
 
 ### Route Groups
@@ -878,21 +882,21 @@ Agrupa rotas sob um prefixo compartilhado, com middlewares e hooks herdados:
 ```js
 // Grupo simples
 app.group('/api/v1', (group) => {
-  group.get('/users', listUsers);       // GET /api/v1/users
-  group.post('/users', createUser);     // POST /api/v1/users
-  group.get('/users/:id', getUser);     // GET /api/v1/users/:id
+  group.get('/users', listUsers); // GET /api/v1/users
+  group.post('/users', createUser); // POST /api/v1/users
+  group.get('/users/:id', getUser); // GET /api/v1/users/:id
 });
 
 // Grupo com middlewares compartilhados
 app.group('/admin', { middlewares: [authMiddleware] }, (group) => {
-  group.get('/dashboard', dashboard);   // GET /admin/dashboard (com auth)
+  group.get('/dashboard', dashboard); // GET /admin/dashboard (com auth)
   group.delete('/users/:id', deleteUser);
 });
 
 // Sub-grupos aninhados (middlewares acumulam: pai → filho → rota)
 app.group('/api', { middlewares: [cors] }, (api) => {
   api.group('/v1', { middlewares: [rateLimit] }, (v1) => {
-    v1.get('/products', listProducts);  // middlewares: [cors, rateLimit]
+    v1.get('/products', listProducts); // middlewares: [cors, rateLimit]
   });
   api.group('/v2', (v2) => {
     v2.get('/products', listProductsV2); // middlewares: [cors]
@@ -919,9 +923,9 @@ app.hasDecorator(name)                 // Verificar decorator
 ### Lifecycle
 
 ```js
-app.addHook(hookName, hookFunction)    // Adicionar hook
-app.setErrorHandler(handler)           // Error handler customizado
-app.setNotFoundHandler(handler)        // 404 handler customizado
+app.addHook(hookName, hookFunction); // Adicionar hook
+app.setErrorHandler(handler); // Error handler customizado
+app.setNotFoundHandler(handler); // 404 handler customizado
 ```
 
 ### Servidor
@@ -1065,7 +1069,7 @@ describe('API', () => {
 
     const response = await app.inject({
       method: 'GET',
-      url: '/'
+      url: '/',
     });
 
     expect(response.statusCode).toBe(200);
@@ -1082,46 +1086,46 @@ A implementação segue uma ordem lógica de dependências:
 
 ### Fase 1 — Fundação (Core)
 
-| #  | Módulo            | Prioridade | Dependência | Descrição                                            |
-| -- | ----------------- | ---------- | ----------- | ---------------------------------------------------- |
-| 1  | `HttpError`       | Alta       | Nenhuma     | Classes de erro HTTP                                 |
-| 2  | `ZentRequest`     | Alta       | Nenhuma     | Wrapper do IncomingMessage                           |
-| 3  | `ZentResponse`    | Alta       | Nenhuma     | Wrapper do ServerResponse                            |
-| 4  | `Context`         | Alta       | 2, 3        | Objeto de contexto (req + res)                       |
-| 5  | `RadixTree`       | Alta       | Nenhuma     | Estrutura de dados para roteamento                   |
-| 6  | `Router`          | Alta       | 5           | API pública do router                                |
+| #   | Módulo         | Prioridade | Dependência | Descrição                          |
+| --- | -------------- | ---------- | ----------- | ---------------------------------- |
+| 1   | `HttpError`    | Alta       | Nenhuma     | Classes de erro HTTP               |
+| 2   | `ZentRequest`  | Alta       | Nenhuma     | Wrapper do IncomingMessage         |
+| 3   | `ZentResponse` | Alta       | Nenhuma     | Wrapper do ServerResponse          |
+| 4   | `Context`      | Alta       | 2, 3        | Objeto de contexto (req + res)     |
+| 5   | `RadixTree`    | Alta       | Nenhuma     | Estrutura de dados para roteamento |
+| 6   | `Router`       | Alta       | 5           | API pública do router              |
 
 ### Fase 2 — Pipeline
 
-| #  | Módulo            | Prioridade | Dependência | Descrição                                            |
-| -- | ----------------- | ---------- | ----------- | ---------------------------------------------------- |
-| 7  | `Pipeline`        | Alta       | 4           | Executor de middlewares (compose)                    |
-| 8  | `Lifecycle`       | Alta       | 7           | Gerenciador de hooks                                 |
-| 9  | `ErrorHandler`    | Alta       | 1, 4        | Handler global de erros                              |
+| #   | Módulo         | Prioridade | Dependência | Descrição                         |
+| --- | -------------- | ---------- | ----------- | --------------------------------- |
+| 7   | `Pipeline`     | Alta       | 4           | Executor de middlewares (compose) |
+| 8   | `Lifecycle`    | Alta       | 7           | Gerenciador de hooks              |
+| 9   | `ErrorHandler` | Alta       | 1, 4        | Handler global de erros           |
 
 ### Fase 3 — Aplicação
 
-| #  | Módulo            | Prioridade | Dependência   | Descrição                                          |
-| -- | ----------------- | ---------- | ------------- | -------------------------------------------------- |
-| 10 | `HttpServer`      | Alta       | 4, 6, 7, 8, 9 | Servidor HTTP + request dispatch                  |
-| 11 | `Application`     | Alta       | 10            | Classe principal Zent                              |
-| 12 | `inject()`        | Média      | 10, 11        | Light-weight request injection para testes         |
+| #   | Módulo        | Prioridade | Dependência   | Descrição                                  |
+| --- | ------------- | ---------- | ------------- | ------------------------------------------ |
+| 10  | `HttpServer`  | Alta       | 4, 6, 7, 8, 9 | Servidor HTTP + request dispatch           |
+| 11  | `Application` | Alta       | 10            | Classe principal Zent                      |
+| 12  | `inject()`    | Média      | 10, 11        | Light-weight request injection para testes |
 
 ### Fase 4 — Plugins e Extras
 
-| #  | Módulo            | Prioridade | Dependência | Descrição                                            |
-| -- | ----------------- | ---------- | ----------- | ---------------------------------------------------- |
-| 13 | `PluginManager`   | Média      | 11          | Sistema de registro e encapsulamento de plugins      |
-| 14 | `bodyParser`      | Média      | Nenhuma     | Middleware built-in para parsing de body             |
-| 15 | `cors`            | Baixa      | Nenhuma     | Middleware built-in para CORS                        |
+| #   | Módulo          | Prioridade | Dependência | Descrição                                       |
+| --- | --------------- | ---------- | ----------- | ----------------------------------------------- |
+| 13  | `PluginManager` | Média      | 11          | Sistema de registro e encapsulamento de plugins |
+| 14  | `bodyParser`    | Média      | Nenhuma     | Middleware built-in para parsing de body        |
+| 15  | `cors`          | Baixa      | Nenhuma     | Middleware built-in para CORS                   |
 
 ### Fase 5 — Polish
 
-| #  | Módulo                | Prioridade | Descrição                                          |
-| -- | --------------------- | ---------- | -------------------------------------------------- |
-| 16 | Testes de integração  | Alta       | Testes end-to-end com supertest                    |
-| 17 | JSDoc + tipos         | Média      | Documentação inline e type hints                   |
-| 18 | Exemplos              | Baixa      | Exemplos na pasta `examples/`                      |
+| #   | Módulo               | Prioridade | Descrição                        |
+| --- | -------------------- | ---------- | -------------------------------- |
+| 16  | Testes de integração | Alta       | Testes end-to-end com supertest  |
+| 17  | JSDoc + tipos        | Média      | Documentação inline e type hints |
+| 18  | Exemplos             | Baixa      | Exemplos na pasta `examples/`    |
 
 ---
 

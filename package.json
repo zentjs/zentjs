@@ -10,8 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint . --ext .js,.mjs && prettier --check . --ext .js,.mjs",
-    "lint:fix": "eslint . --ext .js,.mjs --fix && prettier --write . --ext .js,.mjs"
+    "lint": "eslint . && prettier --check .",
+    "lint:fix": "eslint . --fix && prettier --write ."
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

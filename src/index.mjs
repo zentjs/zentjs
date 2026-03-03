@@ -4,7 +4,7 @@
  */
 
 // Application
-export { zent, Zent } from './core/application.mjs';
+export { Zent, zent } from './core/application.mjs';
 
 // Context
 export { Context } from './core/context.mjs';
@@ -17,25 +17,30 @@ export { ZentResponse } from './http/response.mjs';
 export { Router } from './router/index.mjs';
 
 // Errors
-export {
-  HttpError,
-  BadRequestError,
-  UnauthorizedError,
-  ForbiddenError,
-  NotFoundError,
-  MethodNotAllowedError,
-  ConflictError,
-  UnprocessableEntityError,
-  TooManyRequestsError,
-  InternalServerError,
-} from './errors/http-error.mjs';
 export { ErrorHandler } from './errors/error-handler.mjs';
+export {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  HttpError,
+  InternalServerError,
+  MethodNotAllowedError,
+  NotFoundError,
+  TooManyRequestsError,
+  UnauthorizedError,
+  UnprocessableEntityError,
+} from './errors/http-error.mjs';
 
 // Middleware
 export { compose } from './middleware/pipeline.mjs';
 
+// Plugins
+export { bodyParser } from './plugins/body-parser.mjs';
+export { cors } from './plugins/cors.mjs';
+export { PluginManager } from './plugins/manager.mjs';
+
 // Lifecycle
-export { Lifecycle, HOOK_PHASES } from './hooks/lifecycle.mjs';
+export { HOOK_PHASES, Lifecycle } from './hooks/lifecycle.mjs';
 
 // Utils
 export { HttpStatus, HttpStatusText } from './utils/http-status.mjs';

@@ -13,6 +13,7 @@ import { createServer } from 'node:http';
 import { ErrorHandler } from '../errors/error-handler.mjs';
 import { Lifecycle } from '../hooks/lifecycle.mjs';
 import { compose } from '../middleware/pipeline.mjs';
+import { PluginManager } from '../plugins/manager.mjs';
 import { Router } from '../router/index.mjs';
 import { Context } from './context.mjs';
 
@@ -61,6 +62,9 @@ export class Zent {
   /** @type {Record<string, *>} */
   #decorators;
 
+  /** @type {PluginManager} */
+  #plugins;
+
   /**
    * @param {object} [opts]
    * @param {boolean} [opts.ignoreTrailingSlash=true]
@@ -76,6 +80,7 @@ export class Zent {
     this.#errorHandler = new ErrorHandler();
     this.#middlewares = [];
     this.#decorators = {};
+    this.#plugins = new PluginManager();
   }
 
   // ─── Routing ──────────────────────────────────────────
@@ -179,6 +184,80 @@ export class Zent {
     return name in this.#decorators;
   }
 
+  // ─── Plugins ──────────────────────────────────────────
+
+  /**
+   * Registra um plugin para ser carregado antes do listen/inject.
+   * Cada plugin recebe uma instância encapsulada do app.
+   *
+   * @param {Function} fn - async (app, opts) => {}
+   * @param {object} [opts={}] - Opções do plugin (ex: { prefix: '/api' })
+   * @returns {this}
+   */
+  register(fn, opts = {}) {
+    this.#plugins.register(fn, opts);
+    return this;
+  }
+
+  /**
+   * Carrega todos os plugins registrados se ainda não foram carregados.
+   * Cria escopos encapsulados: rotas do plugin são prefixadas,
+   * hooks e decorators são isolados no escopo, middlewares são herdados.
+   *
+   * @returns {Promise<void>}
+   */
+  async #loadPlugins() {
+    if (this.#plugins.loaded) return;
+
+    await this.#plugins.load((opts) => this.#createScope(opts));
+  }
+
+  /**
+   * Cria um escopo encapsulado para um plugin.
+   * O escopo herda middlewares e hooks do pai mas adiciona
+   * rotas e decorators de forma isolada.
+   *
+   * @param {object} opts - Opções do plugin
+   * @returns {object} Escopo encapsulado com a mesma API do Zent
+   */
+  #createScope(opts) {
+    const prefix = opts.prefix || '';
+    const parent = this;
+
+    return {
+      get: (path, handler, routeOpts) =>
+        parent.get(prefix + path, handler, routeOpts),
+      post: (path, handler, routeOpts) =>
+        parent.post(prefix + path, handler, routeOpts),
+      put: (path, handler, routeOpts) =>
+        parent.put(prefix + path, handler, routeOpts),
+      patch: (path, handler, routeOpts) =>
+        parent.patch(prefix + path, handler, routeOpts),
+      delete: (path, handler, routeOpts) =>
+        parent.delete(prefix + path, handler, routeOpts),
+      head: (path, handler, routeOpts) =>
+        parent.head(prefix + path, handler, routeOpts),
+      options: (path, handler, routeOpts) =>
+        parent.options(prefix + path, handler, routeOpts),
+      all: (path, handler, routeOpts) =>
+        parent.all(prefix + path, handler, routeOpts),
+      route: (def) => parent.route({ ...def, path: prefix + def.path }),
+      group: (groupPrefix, ...args) =>
+        parent.group(prefix + groupPrefix, ...args),
+      use: (fn) => parent.use(fn),
+      addHook: (phase, fn) => parent.addHook(phase, fn),
+      setErrorHandler: (fn) => parent.setErrorHandler(fn),
+      decorate: (name, value) => parent.decorate(name, value),
+      hasDecorator: (name) => parent.hasDecorator(name),
+      register: (fn, pluginOpts) => {
+        parent.#plugins.register((scopedApp) => fn(scopedApp, pluginOpts), {
+          ...pluginOpts,
+          prefix: prefix + (pluginOpts?.prefix || ''),
+        });
+      },
+    };
+  }
+
   // ─── Server ───────────────────────────────────────────
 
   /**
@@ -190,6 +269,8 @@ export class Zent {
    * @returns {Promise<string>} Endereço do servidor
    */
   async listen(opts = {}, callback) {
+    await this.#loadPlugins();
+
     const port = opts.port ?? 3000;
     const host = opts.host ?? '0.0.0.0';
 
@@ -253,6 +334,8 @@ export class Zent {
    * @returns {Promise<{ statusCode: number, headers: object, body: string, json: Function }>}
    */
   async inject(opts) {
+    await this.#loadPlugins();
+
     const { method = 'GET', url = '/', headers = {}, body } = opts;
 
     // Prepara body serializado
