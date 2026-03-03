@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-03T14:20:23.088Z",
+  "generatedAt": "2026-03-03T14:24:52.524Z",
   "node": "v24.14.0",
   "scenarios": [
     {
@@ -8,10 +8,10 @@
         {
           "framework": "zent",
           "scenario": "static_get",
-          "reqPerSec": 14516,
-          "latencyMsAvg": 3.14,
+          "reqPerSec": 15873.6,
+          "latencyMsAvg": 2.51,
           "latencyMsP99": 4,
-          "throughputBytesPerSec": 2888704,
+          "throughputBytesPerSec": 3158630.4,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0
@@ -19,10 +19,10 @@
         {
           "framework": "fastify",
           "scenario": "static_get",
-          "reqPerSec": 19035.2,
-          "latencyMsAvg": 2.07,
+          "reqPerSec": 19374.41,
+          "latencyMsAvg": 2.06,
           "latencyMsP99": 3,
-          "throughputBytesPerSec": 3464601.6,
+          "throughputBytesPerSec": 3526041.6,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0
@@ -30,10 +30,10 @@
         {
           "framework": "express",
           "scenario": "static_get",
-          "reqPerSec": 12445.6,
-          "latencyMsAvg": 3.31,
+          "reqPerSec": 12332,
+          "latencyMsAvg": 3.37,
           "latencyMsP99": 5,
-          "throughputBytesPerSec": 3049267.2,
+          "throughputBytesPerSec": 3021004.8,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0
@@ -46,10 +46,10 @@
         {
           "framework": "zent",
           "scenario": "param_get",
-          "reqPerSec": 14986.4,
-          "latencyMsAvg": 3.02,
+          "reqPerSec": 15894.4,
+          "latencyMsAvg": 2.71,
           "latencyMsP99": 3,
-          "throughputBytesPerSec": 2996838.4,
+          "throughputBytesPerSec": 3179110.4,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0
@@ -57,10 +57,10 @@
         {
           "framework": "fastify",
           "scenario": "param_get",
-          "reqPerSec": 19051.2,
+          "reqPerSec": 19512,
           "latencyMsAvg": 2.03,
           "latencyMsP99": 3,
-          "throughputBytesPerSec": 3486310.4,
+          "throughputBytesPerSec": 3570688,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0
@@ -68,10 +68,10 @@
         {
           "framework": "express",
           "scenario": "param_get",
-          "reqPerSec": 12349.6,
-          "latencyMsAvg": 3.44,
+          "reqPerSec": 12354.4,
+          "latencyMsAvg": 3.36,
           "latencyMsP99": 5,
-          "throughputBytesPerSec": 3038208,
+          "throughputBytesPerSec": 3039436.8,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0
@@ -84,10 +84,10 @@
         {
           "framework": "zent",
           "scenario": "json_post",
-          "reqPerSec": 12866.4,
-          "latencyMsAvg": 3.23,
-          "latencyMsP99": 4,
-          "throughputBytesPerSec": 2843238.4,
+          "reqPerSec": 13405.6,
+          "latencyMsAvg": 3.21,
+          "latencyMsP99": 5,
+          "throughputBytesPerSec": 2962432,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0
@@ -95,10 +95,10 @@
         {
           "framework": "fastify",
           "scenario": "json_post",
-          "reqPerSec": 12565.6,
-          "latencyMsAvg": 3.34,
+          "reqPerSec": 12485.6,
+          "latencyMsAvg": 3.37,
           "latencyMsP99": 9,
-          "throughputBytesPerSec": 2550784,
+          "throughputBytesPerSec": 2534400,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0
@@ -106,10 +106,10 @@
         {
           "framework": "express",
           "scenario": "json_post",
-          "reqPerSec": 10160.8,
-          "latencyMsAvg": 4.27,
+          "reqPerSec": 9866.4,
+          "latencyMsAvg": 4.46,
           "latencyMsP99": 6,
-          "throughputBytesPerSec": 2712985.6,
+          "throughputBytesPerSec": 2633932.8,
           "non2xx": 0,
           "errors": 0,
           "timeouts": 0

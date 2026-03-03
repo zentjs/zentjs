@@ -1,4 +1,39 @@
-import { URL } from 'node:url';
+function resolvePathFromUrl(rawUrl) {
+  if (!rawUrl) return '/';
+
+  const queryIndex = rawUrl.indexOf('?');
+  const path = queryIndex === -1 ? rawUrl : rawUrl.slice(0, queryIndex);
+
+  return path || '/';
+}
+
+function resolveQueryFromUrl(rawUrl) {
+  if (!rawUrl) return {};
+
+  const queryIndex = rawUrl.indexOf('?');
+  if (queryIndex === -1 || queryIndex === rawUrl.length - 1) return {};
+
+  return Object.fromEntries(new URLSearchParams(rawUrl.slice(queryIndex + 1)));
+}
+
+function resolveHostnameFromHostHeader(host) {
+  if (!host) return 'localhost';
+
+  const rawHost = Array.isArray(host) ? host[0] : host;
+  if (!rawHost) return 'localhost';
+
+  if (rawHost.startsWith('[')) {
+    const end = rawHost.indexOf(']');
+    if (end !== -1) {
+      return rawHost.slice(0, end + 1);
+    }
+  }
+
+  const colonIndex = rawHost.indexOf(':');
+  if (colonIndex === -1) return rawHost;
+
+  return rawHost.slice(0, colonIndex);
+}
 
 /**
  * Wrapper sobre http.IncomingMessage.
@@ -8,8 +43,14 @@ export class ZentRequest {
   /** @type {import('node:http').IncomingMessage} */
   #raw;
 
-  /** @type {URL} */
-  #parsedUrl;
+  /** @type {string | undefined} */
+  #pathCache;
+
+  /** @type {Record<string, string> | undefined} */
+  #queryCache;
+
+  /** @type {string | undefined} */
+  #hostnameCache;
 
   /** @type {Record<string, string>} */
   #params = {};
@@ -22,10 +63,9 @@ export class ZentRequest {
    */
   constructor(raw) {
     this.#raw = raw;
-    this.#parsedUrl = new URL(
-      raw.url,
-      `http://${raw.headers.host || 'localhost'}`
-    );
+    this.#pathCache = undefined;
+    this.#queryCache = undefined;
+    this.#hostnameCache = undefined;
   }
 
   /** Objeto IncomingMessage original (escape hatch) */
@@ -45,12 +85,20 @@ export class ZentRequest {
 
   /** @returns {string} Path sem query string */
   get path() {
-    return this.#parsedUrl.pathname;
+    if (this.#pathCache === undefined) {
+      this.#pathCache = resolvePathFromUrl(this.#raw.url);
+    }
+
+    return this.#pathCache;
   }
 
   /** @returns {Record<string, string>} Query params como objeto */
   get query() {
-    return Object.fromEntries(this.#parsedUrl.searchParams);
+    if (this.#queryCache === undefined) {
+      this.#queryCache = resolveQueryFromUrl(this.#raw.url);
+    }
+
+    return this.#queryCache;
   }
 
   /** @returns {import('node:http').IncomingHttpHeaders} */
@@ -74,7 +122,13 @@ export class ZentRequest {
 
   /** @returns {string} Hostname da requisição */
   get hostname() {
-    return this.#parsedUrl.hostname;
+    if (this.#hostnameCache === undefined) {
+      this.#hostnameCache = resolveHostnameFromHostHeader(
+        this.#raw.headers.host
+      );
+    }
+
+    return this.#hostnameCache;
   }
 
   /** @returns {string} 'http' ou 'https' */
