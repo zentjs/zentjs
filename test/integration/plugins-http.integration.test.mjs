@@ -135,4 +135,32 @@ describe('Integration — plugins over real HTTP', () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ ok: true, source: 'onSend' });
   });
+
+  it('applies prefixed middleware only to matching routes over network', async () => {
+    app = zent();
+
+    app.use('/api', async (ctx, next) => {
+      ctx.res.header('x-scope', 'api');
+      await next();
+    });
+
+    app.get('/api/users', (ctx) => {
+      ctx.res.json({ scope: 'api' });
+    });
+
+    app.get('/health', (ctx) => {
+      ctx.res.json({ ok: true });
+    });
+
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+
+    const apiResponse = await request(address).get('/api/users');
+    const healthResponse = await request(address).get('/health');
+
+    expect(apiResponse.status).toBe(200);
+    expect(apiResponse.headers['x-scope']).toBe('api');
+
+    expect(healthResponse.status).toBe(200);
+    expect(healthResponse.headers['x-scope']).toBeUndefined();
+  });
 });

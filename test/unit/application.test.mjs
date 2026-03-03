@@ -169,6 +169,55 @@ describe('Application (Zent)', () => {
 
       expect(res.json()).toEqual({ user: 'alice' });
     });
+
+    it('should execute prefixed middleware only for matching paths', async () => {
+      const app = zent();
+      const hits = [];
+
+      app.use('/api', async (ctx, next) => {
+        hits.push(`mw:${ctx.req.path}`);
+        await next();
+      });
+
+      app.get('/api/users', (ctx) => {
+        ctx.res.json({ scope: 'api' });
+      });
+
+      app.get('/health', (ctx) => {
+        ctx.res.json({ ok: true });
+      });
+
+      await app.inject({ method: 'GET', url: '/api/users' });
+      await app.inject({ method: 'GET', url: '/health' });
+
+      expect(hits).toEqual(['mw:/api/users']);
+    });
+
+    it('should not match similar prefix names', async () => {
+      const app = zent();
+      let called = 0;
+
+      app.use('/api', async (ctx, next) => {
+        called += 1;
+        await next();
+      });
+
+      app.get('/apix/test', (ctx) => {
+        ctx.res.json({ ok: true });
+      });
+
+      await app.inject({ method: 'GET', url: '/apix/test' });
+
+      expect(called).toBe(0);
+    });
+
+    it('should throw for invalid prefixed middleware signature', () => {
+      const app = zent();
+
+      expect(() => app.use('/api', 'not-fn')).toThrow(
+        'Invalid use() signature'
+      );
+    });
   });
 
   describe('route-level middleware', () => {

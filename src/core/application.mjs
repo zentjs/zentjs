@@ -28,6 +28,31 @@ const HTTP_METHODS = [
 ];
 
 /**
+ * Normaliza prefixo de middleware.
+ * @param {string} prefix
+ * @returns {string}
+ */
+function normalizeMiddlewarePrefix(prefix) {
+  const trimmed = prefix.trim();
+
+  if (!trimmed || trimmed === '/') return '/';
+
+  const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return withLeadingSlash.replace(/\/+$/, '');
+}
+
+/**
+ * Verifica se o path atual pertence ao prefixo configurado.
+ * @param {string} path
+ * @param {string} prefix
+ * @returns {boolean}
+ */
+function pathMatchesPrefix(path, prefix) {
+  if (prefix === '/') return true;
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+/**
  * Cria uma nova instância da aplicação ZentJS.
  *
  * @param {object} [opts]
@@ -118,17 +143,38 @@ export class Zent {
   // ─── Middleware ───────────────────────────────────────
 
   /**
-   * Registra um middleware global.
-   * @param {Function} fn - async (ctx, next) => {}
+   * Registra middleware global ou com prefixo.
+   * @param {Function|string} arg1 - middleware ou prefixo
+   * @param {Function} [arg2] - middleware quando usar prefixo
    * @returns {this}
    */
-  use(fn) {
-    if (typeof fn !== 'function') {
-      throw new TypeError(`Middleware must be a function, got ${typeof fn}`);
+  use(arg1, arg2) {
+    if (typeof arg1 === 'function' && arg2 === undefined) {
+      this.#middlewares.push(arg1);
+      return this;
     }
 
-    this.#middlewares.push(fn);
-    return this;
+    if (typeof arg1 === 'string' && typeof arg2 === 'function') {
+      const prefix = normalizeMiddlewarePrefix(arg1);
+
+      this.#middlewares.push(async (ctx, next) => {
+        if (!pathMatchesPrefix(ctx.req.path, prefix)) {
+          return next();
+        }
+
+        return arg2(ctx, next);
+      });
+
+      return this;
+    }
+
+    if (arg2 === undefined) {
+      throw new TypeError(`Middleware must be a function, got ${typeof arg1}`);
+    }
+
+    throw new TypeError(
+      'Invalid use() signature. Expected use(middleware) or use(prefix, middleware)'
+    );
   }
 
   // ─── Lifecycle Hooks ──────────────────────────────────
@@ -244,7 +290,7 @@ export class Zent {
       route: (def) => parent.route({ ...def, path: prefix + def.path }),
       group: (groupPrefix, ...args) =>
         parent.group(prefix + groupPrefix, ...args),
-      use: (fn) => parent.use(fn),
+      use: (...useArgs) => parent.use(...useArgs),
       addHook: (phase, fn) => parent.addHook(phase, fn),
       setErrorHandler: (fn) => parent.setErrorHandler(fn),
       decorate: (name, value) => parent.decorate(name, value),
