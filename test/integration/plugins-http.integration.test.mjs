@@ -1,3 +1,4 @@
+import request from 'supertest';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { zent } from '../../src/core/application.mjs';
@@ -39,25 +40,19 @@ describe('Integration — plugins over real HTTP', () => {
 
     const address = await app.listen({ port: 0, host: '127.0.0.1' });
 
-    const response = await fetch(`${address}/api/echo`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        origin: 'http://client.local',
-      },
-      body: JSON.stringify({ ok: true, n: 1 }),
-    });
+    const response = await request(address)
+      .post('/api/echo')
+      .set('content-type', 'application/json')
+      .set('origin', 'http://client.local')
+      .send({ ok: true, n: 1 });
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('access-control-allow-origin')).toBe(
+    expect(response.headers['access-control-allow-origin']).toBe(
       'http://client.local'
     );
-    expect(response.headers.get('access-control-allow-credentials')).toBe(
-      'true'
-    );
+    expect(response.headers['access-control-allow-credentials']).toBe('true');
 
-    const payload = await response.json();
-    expect(payload).toEqual({
+    expect(response.body).toEqual({
       body: { ok: true, n: 1 },
       origin: 'http://client.local',
     });
@@ -81,26 +76,21 @@ describe('Integration — plugins over real HTTP', () => {
 
     const address = await app.listen({ port: 0, host: '127.0.0.1' });
 
-    const response = await fetch(`${address}/items`, {
-      method: 'OPTIONS',
-      headers: {
-        origin: 'http://client.local',
-        'access-control-request-method': 'POST',
-        'access-control-request-headers': 'content-type,authorization',
-      },
-    });
+    const response = await request(address)
+      .options('/items')
+      .set('origin', 'http://client.local')
+      .set('access-control-request-method', 'POST')
+      .set('access-control-request-headers', 'content-type,authorization');
 
     expect(response.status).toBe(204);
-    expect(response.headers.get('access-control-allow-origin')).toBe(
+    expect(response.headers['access-control-allow-origin']).toBe(
       'http://client.local'
     );
-    expect(response.headers.get('access-control-allow-methods')).toBe(
-      'GET, POST'
-    );
-    expect(response.headers.get('access-control-allow-headers')).toBe(
+    expect(response.headers['access-control-allow-methods']).toBe('GET, POST');
+    expect(response.headers['access-control-allow-headers']).toBe(
       'content-type, authorization'
     );
-    expect(response.headers.get('access-control-max-age')).toBe('600');
+    expect(response.headers['access-control-max-age']).toBe('600');
   });
 
   it('supports nested plugin prefixes over network', async () => {
@@ -122,9 +112,9 @@ describe('Integration — plugins over real HTTP', () => {
 
     const address = await app.listen({ port: 0, host: '127.0.0.1' });
 
-    const response = await fetch(`${address}/api/v1/health`);
+    const response = await request(address).get('/api/v1/health');
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true });
+    expect(response.body).toEqual({ ok: true });
   });
 });

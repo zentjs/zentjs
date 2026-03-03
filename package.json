@@ -8,6 +8,8 @@
   "main": "index.js",
   "scripts": {
     "test": "vitest run",
+    "test:unit": "vitest run test/unit",
+    "test:integration": "vitest run test/integration",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . && prettier --check .",
