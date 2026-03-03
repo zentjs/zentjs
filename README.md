@@ -1,8 +1,13 @@
 # ZentJS
 
+[![CI](https://github.com/walber-vaz/zentjs/actions/workflows/ci.yml/badge.svg)](https://github.com/walber-vaz/zentjs/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/%40zentjs%2Fzentjs)](https://www.npmjs.com/package/@zentjs/zentjs)
+[![npm downloads](https://img.shields.io/npm/dm/%40zentjs%2Fzentjs)](https://www.npmjs.com/package/@zentjs/zentjs)
+[![license](https://img.shields.io/npm/l/%40zentjs%2Fzentjs)](LICENSE)
+
 > Framework web minimalista e performático para Node.js, inspirado no Express e Fastify.
 
-**Zero dependências em runtime** · **ESM-only** · **Node.js ≥ 20**
+**Zero dependências em runtime** · **ESM-only** · **Node.js ≥ 24**
 
 ---
 
@@ -45,8 +50,8 @@
 A evolução da documentação agora segue etapas incrementais com checklist versionado.
 
 - Arquivo de acompanhamento: [docs/DOCUMENTATION_TODO.md](docs/DOCUMENTATION_TODO.md)
-- Status atual: **Etapa 5 concluída**
-- Próxima etapa: **Etapa 6** (revisão final e consistência)
+- Status atual: **Etapa 6 concluída**
+- Próxima etapa: manutenção contínua da documentação por PR
 
 > Regra de ouro: documentar apenas comportamento já implementado no runtime.
 
@@ -57,7 +62,7 @@ A evolução da documentação agora segue etapas incrementais com checklist ver
 Este README é a referência principal do projeto e segue atualização incremental por etapas.
 
 - Fonte de controle: [docs/DOCUMENTATION_TODO.md](docs/DOCUMENTATION_TODO.md)
-- Escopo atual: estrutura editorial e padronização de linguagem
+- Escopo atual: consistência final entre runtime, README e exemplos
 - Política: exemplos e contratos devem refletir o runtime real em `src/`
 
 ---
@@ -230,7 +235,6 @@ import { zent } from 'zentjs';
 
 const app = zent({
   // Opções de configuração
-  logger: true, // Habilitar logging básico
   ignoreTrailingSlash: true, // /users e /users/ são a mesma rota
 });
 
@@ -1143,10 +1147,7 @@ Resposta de `inject()`:
 
 ```js
 {
-  statusCode,
-  headers,
-  body,
-  json() // helper para JSON.parse(body)
+  (statusCode, headers, body, json()); // helper para JSON.parse(body)
 }
 ```
 
@@ -1199,7 +1200,7 @@ app.listen({ port: 3000 });
 ```js
 import { zent, bodyParser, NotFoundError } from 'zentjs';
 
-const app = zent({ logger: true });
+const app = zent();
 
 // Middleware global para parsear body
 app.use(bodyParser());

@@ -1,12 +1,43 @@
 {
-  "name": "zentjs",
+  "name": "@zentjs/zentjs",
   "version": "0.0.1",
-  "description": "Framework API Web",
+  "description": "Framework web minimalista e performático para Node.js",
   "license": "BSD-3-Clause",
   "author": "Walber Vaz",
   "type": "module",
-  "main": "index.js",
+  "main": "./src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/walber-vaz/zentjs.git"
+  },
+  "bugs": {
+    "url": "https://github.com/walber-vaz/zentjs/issues"
+  },
+  "homepage": "https://github.com/walber-vaz/zentjs#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "zentjs",
+    "framework",
+    "http",
+    "api",
+    "nodejs",
+    "esm"
+  ],
   "scripts": {
+    "build": "npm run lint && npm run test && npm pack --dry-run",
     "test": "vitest run",
     "test:unit": "vitest run test/unit",
     "test:integration": "vitest run test/integration",
@@ -16,7 +47,8 @@
     "bench:save-baseline": "node bench/run-benchmarks.mjs --save-baseline",
     "bench:frameworks": "node bench/frameworks-bench.mjs",
     "lint": "eslint . && prettier --check .",
-    "lint:fix": "eslint . --fix && prettier --write ."
+    "lint:fix": "eslint . --fix && prettier --write .",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

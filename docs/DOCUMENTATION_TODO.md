@@ -10,7 +10,7 @@ Plano incremental para evoluir a documentação com entregas pequenas, revisáve
 - [x] Etapa 3 — Lifecycle, middlewares e erros
 - [x] Etapa 4 — Plugins e encapsulamento
 - [x] Etapa 5 — Guias práticos e receitas
-- [ ] Etapa 6 — Revisão final e consistência
+- [x] Etapa 6 — Revisão final e consistência
 
 ---
 
@@ -142,14 +142,18 @@ Objetivo: fechar ciclo com qualidade editorial e técnica.
 
 Entregas:
 
-- [ ] Revisão de consistência API x README x exemplos
-- [ ] Revisão de linguagem (PT-BR técnico consistente)
-- [ ] Ajustes de markdown lint e legibilidade
-- [ ] Checklist final de links internos
+- [x] Revisão de consistência API x README x exemplos
+- [x] Revisão de linguagem (PT-BR técnico consistente)
+- [x] Ajustes de markdown lint e legibilidade
+- [x] Checklist final de links internos
 
 Critério de pronto:
 
 - Documentação estável para release e manutenção contínua.
+
+Status da etapa:
+
+- [x] Concluída em 03/03/2026
 
 ---
 
