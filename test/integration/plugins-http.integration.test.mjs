@@ -163,4 +163,46 @@ describe('Integration — plugins over real HTTP', () => {
     expect(healthResponse.status).toBe(200);
     expect(healthResponse.headers['x-scope']).toBeUndefined();
   });
+
+  it('uses custom not found handler over network', async () => {
+    app = zent();
+
+    app.setNotFoundHandler((ctx) => {
+      ctx.res.status(404).json({
+        custom: true,
+        path: ctx.req.path,
+      });
+    });
+
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+    const response = await request(address).get('/does-not-exist');
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({
+      custom: true,
+      path: '/does-not-exist',
+    });
+  });
+
+  it('applies route-level onSend hook over network', async () => {
+    app = zent();
+
+    app.get(
+      '/route-onsend',
+      () => {
+        return { ok: true };
+      },
+      {
+        hooks: {
+          onSend: async (ctx, payload) => ({ ...payload, route: true }),
+        },
+      }
+    );
+
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+    const response = await request(address).get('/route-onsend');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ ok: true, route: true });
+  });
 });

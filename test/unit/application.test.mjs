@@ -414,6 +414,68 @@ describe('Application (Zent)', () => {
     });
   });
 
+  describe('setNotFoundHandler()', () => {
+    it('should return chaining from setNotFoundHandler', () => {
+      const app = zent();
+      const result = app.setNotFoundHandler((ctx) => {
+        ctx.res.status(404).json({ custom: true });
+      });
+
+      expect(result).toBe(app);
+    });
+
+    it('should use custom not found handler for missing route', async () => {
+      const app = zent();
+
+      app.setNotFoundHandler((ctx) => {
+        ctx.res.status(404).json({ custom404: true, path: ctx.req.path });
+      });
+
+      const res = await app.inject({ method: 'GET', url: '/unknown' });
+
+      expect(res.statusCode).toBe(404);
+      expect(res.json()).toEqual({ custom404: true, path: '/unknown' });
+    });
+
+    it('should fallback to default 404 payload if custom handler does not send', async () => {
+      const app = zent();
+
+      app.setNotFoundHandler(() => {
+        // intentionally does not send response
+      });
+
+      const res = await app.inject({ method: 'GET', url: '/missing' });
+
+      expect(res.statusCode).toBe(404);
+      expect(res.json()).toEqual({
+        statusCode: 404,
+        error: 'Not Found',
+        message: 'Not Found',
+      });
+    });
+
+    it('should not intercept method not allowed errors', async () => {
+      const app = zent();
+
+      app.setNotFoundHandler((ctx) => {
+        ctx.res.status(404).json({ custom404: true });
+      });
+
+      app.get('/users', (ctx) => ctx.res.json({ ok: true }));
+
+      const res = await app.inject({ method: 'DELETE', url: '/users' });
+
+      expect(res.statusCode).toBe(405);
+      expect(res.json().error).toBe('Method Not Allowed');
+    });
+
+    it('should throw TypeError for non-function not found handler', () => {
+      const app = zent();
+
+      expect(() => app.setNotFoundHandler('not-fn')).toThrow(TypeError);
+    });
+  });
+
   describe('decorate()', () => {
     it('should add property to app instance', () => {
       const app = zent();
@@ -692,6 +754,105 @@ describe('Application (Zent)', () => {
       await app.inject({ method: 'GET', url: '/test' });
 
       expect(order).toEqual(['route-hook', 'handler']);
+    });
+
+    it('should execute route-level preValidation hooks', async () => {
+      const app = zent();
+      const order = [];
+
+      app.addHook('preValidation', async () =>
+        order.push('global-preValidation')
+      );
+
+      app.get(
+        '/validate',
+        (ctx) => {
+          order.push('handler');
+          ctx.res.json({ ok: true });
+        },
+        {
+          hooks: {
+            preValidation: [async () => order.push('route-preValidation')],
+          },
+        }
+      );
+
+      await app.inject({ method: 'GET', url: '/validate' });
+
+      expect(order).toEqual([
+        'global-preValidation',
+        'route-preValidation',
+        'handler',
+      ]);
+    });
+
+    it('should execute route-level onSend hooks and transform payload', async () => {
+      const app = zent();
+
+      app.get(
+        '/route-onsend',
+        () => {
+          return { ok: true };
+        },
+        {
+          hooks: {
+            onSend: async (ctx, payload) => ({ ...payload, route: true }),
+          },
+        }
+      );
+
+      const res = await app.inject({ method: 'GET', url: '/route-onsend' });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ ok: true, route: true });
+    });
+
+    it('should execute route-level onResponse hooks', async () => {
+      const app = zent();
+      const order = [];
+
+      app.addHook('onResponse', async () => order.push('global-onResponse'));
+
+      app.get(
+        '/route-onresponse',
+        (ctx) => {
+          ctx.res.json({ ok: true });
+        },
+        {
+          hooks: {
+            onResponse: async () => order.push('route-onResponse'),
+          },
+        }
+      );
+
+      await app.inject({ method: 'GET', url: '/route-onresponse' });
+
+      expect(order).toEqual(['global-onResponse', 'route-onResponse']);
+    });
+
+    it('should execute route-level onError hooks', async () => {
+      const app = zent();
+      let routeHookError;
+
+      app.get(
+        '/route-onerror',
+        () => {
+          throw new Error('route fail');
+        },
+        {
+          hooks: {
+            onError: async (ctx, err) => {
+              routeHookError = err;
+            },
+          },
+        }
+      );
+
+      const res = await app.inject({ method: 'GET', url: '/route-onerror' });
+
+      expect(res.statusCode).toBe(500);
+      expect(routeHookError).toBeDefined();
+      expect(routeHookError.message).toBe('route fail');
     });
   });
 

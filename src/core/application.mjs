@@ -11,6 +11,7 @@
 import { createServer } from 'node:http';
 
 import { ErrorHandler } from '../errors/error-handler.mjs';
+import { NotFoundError } from '../errors/http-error.mjs';
 import { Lifecycle } from '../hooks/lifecycle.mjs';
 import { compose } from '../middleware/pipeline.mjs';
 import { PluginManager } from '../plugins/manager.mjs';
@@ -90,6 +91,9 @@ export class Zent {
   /** @type {PluginManager} */
   #plugins;
 
+  /** @type {((ctx: Context) => void | Promise<void>) | null} */
+  #notFoundHandler;
+
   /**
    * @param {object} [opts]
    * @param {boolean} [opts.ignoreTrailingSlash=true]
@@ -106,6 +110,7 @@ export class Zent {
     this.#middlewares = [];
     this.#decorators = {};
     this.#plugins = new PluginManager();
+    this.#notFoundHandler = null;
   }
 
   // ─── Routing ──────────────────────────────────────────
@@ -202,6 +207,22 @@ export class Zent {
     return this;
   }
 
+  /**
+   * Define um handler customizado para rotas não encontradas (404).
+   * @param {(ctx: Context) => void | Promise<void>} fn
+   * @returns {this}
+   */
+  setNotFoundHandler(fn) {
+    if (typeof fn !== 'function') {
+      throw new TypeError(
+        `Not found handler must be a function, got ${typeof fn}`
+      );
+    }
+
+    this.#notFoundHandler = fn;
+    return this;
+  }
+
   // ─── Decorators ───────────────────────────────────────
 
   /**
@@ -293,6 +314,7 @@ export class Zent {
       use: (...useArgs) => parent.use(...useArgs),
       addHook: (phase, fn) => parent.addHook(phase, fn),
       setErrorHandler: (fn) => parent.setErrorHandler(fn),
+      setNotFoundHandler: (fn) => parent.setNotFoundHandler(fn),
       decorate: (name, value) => parent.decorate(name, value),
       hasDecorator: (name) => parent.hasDecorator(name),
       register: (fn, pluginOpts) => {
@@ -459,6 +481,7 @@ export class Zent {
    */
   async #handleRequest(rawReq, rawRes) {
     const ctx = new Context(rawReq, rawRes, this);
+    let route = null;
 
     try {
       let handlerResult;
@@ -467,16 +490,26 @@ export class Zent {
       await this.#lifecycle.run('onRequest', ctx);
 
       // 2. Router lookup
-      const { route, params } = this.#router.find(ctx.req.method, ctx.req.path);
+      const matchedRoute = await this.#findRoute(ctx);
+
+      if (!matchedRoute) {
+        await this.#lifecycle.run('onResponse', ctx);
+        return;
+      }
+
+      const { route: resolvedRoute, params } = matchedRoute;
+      route = resolvedRoute;
 
       // 3. Set params no request
       ctx.req.params = params;
 
       // 4. preParsing hooks
       await this.#lifecycle.run('preParsing', ctx);
+      await this.#runRouteHooks(route, 'preParsing', ctx);
 
       // 5. preValidation hooks
       await this.#lifecycle.run('preValidation', ctx);
+      await this.#runRouteHooks(route, 'preValidation', ctx);
 
       // 6. Montar pipeline: global middlewares + route middlewares + handler
       const routeMiddlewares = route.middlewares || [];
@@ -485,17 +518,7 @@ export class Zent {
       // 7. preHandler hooks (executados dentro do pipeline, antes do handler)
       const handler = async (ctx) => {
         await this.#lifecycle.run('preHandler', ctx);
-
-        // Execute route-level hooks (preHandler)
-        if (route.hooks?.preHandler) {
-          const routePreHandlers = Array.isArray(route.hooks.preHandler)
-            ? route.hooks.preHandler
-            : [route.hooks.preHandler];
-
-          for (const hook of routePreHandlers) {
-            await hook(ctx);
-          }
-        }
+        await this.#runRouteHooks(route, 'preHandler', ctx);
 
         handlerResult = await route.handler(ctx);
       };
@@ -506,12 +529,14 @@ export class Zent {
 
       // 8.1 onSend + envio automático para payload retornado pelo handler
       if (!ctx.res.sent && handlerResult !== undefined) {
-        const payload = await this.#lifecycle.run('onSend', ctx, handlerResult);
+        let payload = await this.#lifecycle.run('onSend', ctx, handlerResult);
+        payload = await this.#runRouteOnSendHooks(route, ctx, payload);
         this.#sendPayload(ctx, payload);
       }
 
       // 9. onResponse hooks (após a resposta ser preparada/enviada)
       await this.#lifecycle.run('onResponse', ctx);
+      await this.#runRouteHooks(route, 'onResponse', ctx);
     } catch (error) {
       // Executa onError hooks
       if (this.#lifecycle.hasHooks('onError')) {
@@ -522,8 +547,97 @@ export class Zent {
         }
       }
 
+      if (route) {
+        try {
+          await this.#runRouteHooks(route, 'onError', ctx, error);
+        } catch {
+          // Se onError da rota falhar, continua para o error handler
+        }
+      }
+
       // Error handler gera a resposta de erro
       await this.#errorHandler.handle(error, ctx);
+    }
+  }
+
+  /**
+   * Executa hooks de rota para uma fase (exceto onSend).
+   * @param {object | null} route
+   * @param {string} phase
+   * @param {Context} ctx
+   * @param {...*} args
+   * @returns {Promise<void>}
+   */
+  async #runRouteHooks(route, phase, ctx, ...args) {
+    if (!route?.hooks?.[phase]) return;
+
+    const hooks = Array.isArray(route.hooks[phase])
+      ? route.hooks[phase]
+      : [route.hooks[phase]];
+
+    for (const hook of hooks) {
+      await hook(ctx, ...args);
+    }
+  }
+
+  /**
+   * Executa hooks de rota de onSend encadeando payload.
+   * @param {object | null} route
+   * @param {Context} ctx
+   * @param {*} payload
+   * @returns {Promise<*>}
+   */
+  async #runRouteOnSendHooks(route, ctx, payload) {
+    if (!route?.hooks?.onSend) return payload;
+
+    const hooks = Array.isArray(route.hooks.onSend)
+      ? route.hooks.onSend
+      : [route.hooks.onSend];
+
+    let current = payload;
+
+    for (const hook of hooks) {
+      const result = await hook(ctx, current);
+      if (result !== undefined) {
+        current = result;
+      }
+    }
+
+    return current;
+  }
+
+  /**
+   * Busca rota e aplica notFound handler customizado quando definido.
+   * @param {Context} ctx
+   * @returns {{ route: object, params: Record<string, string> }}
+   */
+  async #findRoute(ctx) {
+    try {
+      return this.#router.find(ctx.req.method, ctx.req.path);
+    } catch (error) {
+      if (
+        error instanceof NotFoundError &&
+        this.#notFoundHandler &&
+        !ctx.res.sent
+      ) {
+        await this.#handleNotFound(ctx);
+        return null;
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Executa handler customizado de 404.
+   * @param {Context} ctx
+   * @returns {Promise<void>}
+   */
+  async #handleNotFound(ctx) {
+    await this.#notFoundHandler(ctx);
+
+    if (!ctx.res.sent) {
+      ctx.res.status(404).json(new NotFoundError().toJSON());
     }
   }
 
